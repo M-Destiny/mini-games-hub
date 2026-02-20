@@ -33,8 +33,15 @@ Classic word guessing game!
 - Multiplayer support
 - Round tracking
 
+### ✅ Word Chain (Ready!)
+Connect words with your friends!
+- Players take turns saying words starting with last letter
+- Example: Apple → Elephant → Tiger → Rabbit
+- 10 points per valid word
+- Configurable rounds (1-6)
+- Multiplayer support
+
 ### 🚧 Coming Soon
-- Word Chain
 - Trivia Quiz
 
 ## 🛠️ Tech Stack
@@ -74,12 +81,15 @@ mini-games-hub/
 │   ├── context/SocketContext.tsx   # Socket.io state + reconnection
 │   ├── games/
 │   │   ├── scribble/              # Scribble game
-│   │   └── hangman/              # Hangman game
+│   │   ├── hangman/               # Hangman game
+│   │   └── wordchain/             # Word Chain game
 │   ├── pages/                    # Create/Join pages
 │   │   ├── CreateRoom.tsx         # Scribble room
 │   │   ├── JoinRoom.tsx          # Scribble join
 │   │   ├── CreateHangmanRoom.tsx # Hangman room
-│   │   └── JoinHangmanRoom.tsx   # Hangman join
+│   │   ├── JoinHangmanRoom.tsx   # Hangman join
+│   │   ├── CreateWordChainRoom.tsx # Word Chain room
+│   │   └── JoinWordChainRoom.tsx   # Word Chain join
 │   └── App.tsx                   # Routing
 ├── server/
 │   └── index.js                  # Socket.io server
