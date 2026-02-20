@@ -2,7 +2,6 @@ const { Server } = require('socket.io');
 const { createServer } = require('http');
 
 const httpServer = createServer((req, res) => {
-  // Health check endpoint to keep server alive on Render
   if (req.url === '/health' || req.url === '/') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', players: io.engine.clientsCount }));
@@ -21,48 +20,65 @@ const io = new Server(httpServer, {
 
 const rooms = new Map();
 
-const DEFAULT_WORDS = [
-  'apple', 'banana', 'car', 'dog', 'elephant', 'flower', 'guitar', 'house',
-  'island', 'jungle', 'kite', 'lamp', 'mountain', 'notebook', 'ocean', 'pizza',
-  'queen', 'rainbow', 'sunflower', 'tree', 'umbrella', 'volcano', 'waterfall', 'xylophone',
-];
+// Word lists for different games
+const WORD_LISTS = {
+  scribble: ['apple', 'banana', 'car', 'dog', 'elephant', 'flower', 'guitar', 'house', 'island', 'jungle', 'kite', 'lamp', 'mountain', 'notebook', 'ocean', 'pizza', 'queen', 'rainbow', 'sunflower', 'tree', 'umbrella', 'volcano', 'waterfall', 'xylophone'],
+  hangman: {
+    animals: ['ELEPHANT', 'GIRAFFE', 'DOLPHIN', 'PENGUIN', 'KANGAROO', 'BUTTERFLY', 'RHINOCEROS', 'CROCODILE', 'HIPPOPOTAMUS', 'OCTOPUS'],
+    fruits: ['APPLE', 'BANANA', 'ORANGE', 'WATERMELON', 'STRAWBERRY', 'PINEAPPLE', 'BLUEBERRY', 'RASPBERRY', 'CHERRY', 'MANGO'],
+    countries: ['AMERICA', 'CANADA', 'BRAZIL', 'GERMANY', 'AUSTRALIA', 'JAPAN', 'CHINA', 'INDIA', 'FRANCE', 'ITALY'],
+    movies: ['AVENGERS', 'TITANIC', 'FROZEN', 'SPIDERMAN', 'BATMAN', 'IRONMAN', 'JURASSIC', 'STARWARS', 'MATRIX', 'GLADIATOR'],
+    sports: ['FOOTBALL', 'CRICKET', 'TENNIS', 'BASKETBALL', 'BASEBALL', 'HOCKEY', 'GOLF', 'SWIMMING', 'BOXING', 'RUGBY'],
+  }
+};
 
-function getRandomWord(words) {
+function getRandomWord(gameType, category = null) {
+  let words;
+  if (gameType === 'hangman') {
+    if (category && WORD_LISTS.hangman[category]) {
+      words = WORD_LISTS.hangman[category];
+    } else {
+      const categories = Object.values(WORD_LISTS.hangman);
+      words = categories[Math.floor(Math.random() * categories.length)];
+    }
+  } else {
+    words = WORD_LISTS.scribble || [];
+  }
   return words[Math.floor(Math.random() * words.length)].toUpperCase();
 }
 
 io.on('connection', (socket) => {
   console.log('Player connected:', socket.id);
 
-  socket.on('create-room', ({ playerName, roomName, settings }, callback) => {
+  socket.on('create-room', ({ playerName, roomName, gameType = 'scribble', settings = {} }, callback) => {
     const roomId = Math.random().toString(36).substr(2, 6).toUpperCase();
     
     const room = {
       id: roomId,
       name: roomName,
+      gameType,
       hostId: socket.id,
-      players: [{
-        id: socket.id,
-        name: playerName,
-        score: 0,
-      }],
+      players: [{ id: socket.id, name: playerName, score: 0 }],
       gameStarted: false,
       currentWord: null,
       isDrawer: null,
       round: 0,
-      totalRounds: settings?.rounds || 3,
-      roundTime: settings?.roundTime || 80,
+      totalRounds: settings.rounds || 3,
+      roundTime: settings.roundTime || 80,
       timeLeft: 0,
-      customWords: settings?.customWords || DEFAULT_WORDS,
+      category: settings.category || 'animals',
+      guessedLetters: [],
+      wrongGuesses: 0,
     };
     
     rooms.set(roomId, room);
     socket.join(roomId);
     socket.data.roomId = roomId;
     socket.data.playerName = playerName;
+    socket.data.gameType = gameType;
     
     callback({ success: true, room, playerId: socket.id });
-    console.log(`Room ${roomId} created by ${playerName}`);
+    console.log(`Room ${roomId} (${gameType}) created by ${playerName}`);
   });
 
   socket.on('join-room', ({ roomId, playerName }, callback) => {
@@ -73,25 +89,19 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Check if player already in room
     const existingPlayer = room.players.find(p => p.id === socket.id);
     if (existingPlayer) {
       callback({ success: true, room, playerId: socket.id });
       return;
     }
     
-    // Add player (can join mid-game)
-    room.players.push({
-      id: socket.id,
-      name: playerName,
-      score: 0,
-    });
+    room.players.push({ id: socket.id, name: playerName, score: 0 });
     
     socket.join(roomId);
     socket.data.roomId = roomId;
     socket.data.playerName = playerName;
+    socket.data.gameType = room.gameType;
     
-    // Notify others
     io.to(roomId).emit('player-joined', { 
       players: room.players,
       playerId: socket.id,
@@ -110,7 +120,6 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Only host can start
     if (room.hostId !== socket.id) {
       callback({ success: false, error: 'Only host can start the game' });
       return;
@@ -123,13 +132,20 @@ io.on('connection', (socket) => {
     
     room.gameStarted = true;
     room.round = 1;
-    room.isDrawer = room.players[0].id;
-    room.currentWord = getRandomWord(room.customWords);
+    room.guessedLetters = [];
+    room.wrongGuesses = 0;
+    
+    if (room.gameType === 'scribble') {
+      room.isDrawer = room.players[0].id;
+      room.currentWord = getRandomWord('scribble');
+    } else {
+      room.isDrawer = null;
+      room.currentWord = getRandomWord('hangman', room.category);
+    }
     room.timeLeft = room.roundTime;
     
     io.to(roomId).emit('game-started', {
       room,
-      drawerId: room.isDrawer,
       word: room.currentWord,
       round: room.round,
       timeLeft: room.timeLeft,
@@ -138,6 +154,7 @@ io.on('connection', (socket) => {
     callback({ success: true });
   });
 
+  // Scribble events
   socket.on('draw', ({ roomId, point }) => {
     socket.to(roomId).emit('draw', point);
   });
@@ -156,12 +173,10 @@ io.on('connection', (socket) => {
       isCorrect,
     });
     
-    if (isCorrect) {
+    if (isCorrect && room.gameType === 'scribble') {
       const points = room.timeLeft * 10;
       const player = room.players.find(p => p.id === socket.id);
-      if (player) {
-        player.score += points;
-      }
+      if (player) player.score += points;
       
       io.to(roomId).emit('correct-guess', {
         playerId: socket.id,
@@ -176,36 +191,85 @@ io.on('connection', (socket) => {
     if (callback) callback({ success: true, isCorrect });
   });
 
-  socket.on('leave-room', () => {
-    handleLeave(socket);
+  // Hangman events
+  socket.on('hangman-guess', ({ roomId, letter }, callback) => {
+    const room = rooms.get(roomId);
+    if (!room || room.gameType !== 'hangman') return;
+    
+    const letterUpper = letter.toUpperCase();
+    if (room.guessedLetters.includes(letterUpper)) {
+      if (callback) callback({ success: false, error: 'Already guessed' });
+      return;
+    }
+    
+    room.guessedLetters.push(letterUpper);
+    
+    const isCorrect = room.currentWord.includes(letterUpper);
+    
+    io.to(roomId).emit('hangman-update', {
+      guessedLetters: room.guessedLetters,
+      wrongGuesses: room.wrongGuesses,
+      playerId: socket.id,
+      playerName: socket.data.playerName,
+      letter: letterUpper,
+      isCorrect,
+    });
+    
+    if (!isCorrect) {
+      room.wrongGuesses++;
+      if (room.wrongGuesses >= 6) {
+        // Game over - word revealed
+        io.to(roomId).emit('hangman-game-over', {
+          word: room.currentWord,
+          winner: null,
+        });
+        room.gameStarted = false;
+      }
+    } else {
+      // Check if won
+      const won = room.currentWord.split('').every(l => room.guessedLetters.includes(l));
+      if (won) {
+        const player = room.players.find(p => p.id === socket.id);
+        if (player) player.score += 100;
+        
+        io.to(roomId).emit('hangman-game-over', {
+          word: room.currentWord,
+          winner: { id: socket.id, name: socket.data.playerName, score: 100 },
+        });
+        room.gameStarted = false;
+      }
+    }
+    
+    if (callback) callback({ success: true, isCorrect });
   });
 
-  socket.on('disconnect', () => {
-    handleLeave(socket);
-  });
+  socket.on('leave-room', () => handleLeave(socket));
+  socket.on('disconnect', () => handleLeave(socket));
 });
 
 function nextRound(roomId, room) {
   if (room.round >= room.totalRounds) {
     room.gameStarted = false;
     const winner = [...room.players].sort((a, b) => b.score - a.score)[0];
-    
-    io.to(roomId).emit('game-over', {
-      winner,
-      scores: room.players,
-    });
+    io.to(roomId).emit('game-over', { winner, scores: room.players });
     return;
   }
   
   room.round++;
-  const currentDrawerIndex = room.players.findIndex(p => p.id === room.isDrawer);
-  room.isDrawer = room.players[(currentDrawerIndex + 1) % room.players.length].id;
-  room.currentWord = getRandomWord(room.customWords);
+  room.guessedLetters = [];
+  room.wrongGuesses = 0;
+  
+  if (room.gameType === 'scribble') {
+    const currentDrawerIndex = room.players.findIndex(p => p.id === room.isDrawer);
+    room.isDrawer = room.players[(currentDrawerIndex + 1) % room.players.length].id;
+    room.currentWord = getRandomWord('scribble');
+  } else {
+    room.currentWord = getRandomWord('hangman', room.category);
+  }
   room.timeLeft = room.roundTime;
   
   io.to(roomId).emit('next-round', {
     round: room.round,
-    drawerId: room.isDrawer,
     word: room.currentWord,
     timeLeft: room.timeLeft,
   });
@@ -223,15 +287,13 @@ function handleLeave(socket) {
   
   if (room.players.length === 0) {
     rooms.delete(roomId);
-    console.log(`Room ${roomId} deleted (empty)`);
+    console.log(`Room ${roomId} deleted`);
   } else {
-    // If host left, assign new host
     if (wasHost && room.players.length > 0) {
       room.hostId = room.players[0].id;
       io.to(roomId).emit('new-host', { hostId: room.hostId });
     }
     
-    // If drawer left mid-game, assign new drawer
     if (room.isDrawer === socket.id && room.gameStarted) {
       room.isDrawer = room.players[0].id;
     }

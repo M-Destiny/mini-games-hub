@@ -43,7 +43,7 @@ export default function CreateRoom() {
       roundTime,
     }));
     
-    createRoom(playerName.trim(), roomName.trim(), {
+    createRoom(playerName.trim(), roomName.trim(), 'scribble', {
       customWords: customWords.length > 0 ? customWords : DEFAULT_WORDS,
       rounds,
       roundTime,

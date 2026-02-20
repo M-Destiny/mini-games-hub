@@ -3,9 +3,10 @@ import { io, type Socket } from 'socket.io-client';
 import type { Player, Room, DrawingPoint, ChatMessage } from '../types';
 
 interface GameSettings {
-  customWords: string[];
+  customWords?: string[];
   rounds: number;
   roundTime: number;
+  category?: string;
 }
 
 interface SocketContextType {
@@ -21,15 +22,19 @@ interface SocketContextType {
   isDrawer: boolean;
   isGameStarted: boolean;
   isHost: boolean;
+  gameType: string;
+  guessedLetters: string[];
+  wrongGuesses: number;
   gameSettings: GameSettings | null;
   
   // Actions
-  createRoom: (playerName: string, roomName: string, settings?: Partial<GameSettings>) => void;
+  createRoom: (playerName: string, roomName: string, gameType?: string, settings?: Partial<GameSettings>) => void;
   joinRoom: (roomId: string, playerName: string) => void;
   leaveRoom: () => void;
   startGame: () => void;
   sendDraw: (point: DrawingPoint) => void;
   sendGuess: (guess: string) => void;
+  sendHangmanGuess: (letter: string) => void;
   sendMessage: (message: string) => void;
 }
 
@@ -52,6 +57,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [isDrawer, setIsDrawer] = useState(false);
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [gameType] = useState('scribble');
+  const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
+  const [wrongGuesses, setWrongGuesses] = useState(0);
   const [gameSettings, setGameSettings] = useState<GameSettings | null>(null);
 
   useEffect(() => {
@@ -158,6 +166,35 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       }]);
     });
 
+    // Hangman events
+    socket.on('hangman-update', ({ guessedLetters: letters, wrongGuesses: wrong, playerId, playerName, letter, isCorrect }) => {
+      setGuessedLetters(letters);
+      setWrongGuesses(wrong);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        playerId,
+        playerName,
+        message: `${letter} - ${isCorrect ? '✓' : '✗'}`,
+        isCorrect: false,
+        timestamp: Date.now(),
+      }]);
+    });
+
+    socket.on('hangman-game-over', ({ word, winner }) => {
+      setIsGameStarted(false);
+      setCurrentWord(word);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        playerId: 'system',
+        playerName: '🎉',
+        message: winner 
+          ? `${winner.name} wins!` 
+          : `Game Over! The word was: ${word}`,
+        isCorrect: false,
+        timestamp: Date.now(),
+      }]);
+    });
+
     socketRef.current = socket;
 
     return () => {
@@ -165,12 +202,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const createRoom = (playerName: string, roomName: string, settings?: Partial<GameSettings>) => {
+  const createRoom = (playerName: string, roomName: string, gameType: string = 'scribble', settings?: Partial<GameSettings>) => {
     if (!socketRef.current) return;
     
     socketRef.current.emit('create-room', { 
       playerName, 
       roomName, 
+      gameType,
       settings: {
         customWords: settings?.customWords || [],
         rounds: settings?.rounds || 3,
@@ -243,6 +281,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socketRef.current.emit('guess', { roomId: room.id, guess });
   };
 
+  const sendHangmanGuess = (letter: string) => {
+    if (!socketRef.current || !room) return;
+    socketRef.current.emit('hangman-guess', { roomId: room.id, letter });
+  };
+
   const sendMessage = (message: string) => {
     // For chat messages (not guesses)
     const msg: ChatMessage = {
@@ -270,6 +313,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       isDrawer,
       isGameStarted,
       isHost,
+      gameType,
+      guessedLetters,
+      wrongGuesses,
       gameSettings,
       createRoom,
       joinRoom,
@@ -277,6 +323,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       startGame,
       sendDraw,
       sendGuess,
+      sendHangmanGuess,
       sendMessage,
     }}>
       {children}
