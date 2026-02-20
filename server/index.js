@@ -180,13 +180,19 @@ io.on('connection', (socket) => {
       room.currentQuestion = getRandomTriviaQuestion();
       room.triviaAnswers = {};
       room.triviaRevealed = false;
-      room.timeLeft = 20; // 20 seconds per trivia question
     } else if (room.gameType === 'hangman') {
       room.isDrawer = null;
       room.currentWord = getRandomWord('hangman', room.category);
-      room.timeLeft = 60; // 60 seconds for Hangman
     }
-    room.timeLeft = room.roundTime || 80;
+    
+    // Set game-specific time limits
+    if (room.gameType === 'trivia') {
+      room.timeLeft = 20;
+    } else if (room.gameType === 'hangman') {
+      room.timeLeft = 60;
+    } else {
+      room.timeLeft = room.roundTime || 80;
+    }
     
     io.to(roomId).emit('game-started', {
       room,
@@ -253,7 +259,7 @@ io.on('connection', (socket) => {
   // Hangman events
   socket.on('hangman-guess', ({ roomId, letter }, callback) => {
     const room = rooms.get(roomId);
-    if (!room || room.gameType !== 'hangman') return;
+    if (!room || room.gameType !== 'hangman' || !room.gameStarted) return;
     
     const letterUpper = letter.toUpperCase();
     if (room.guessedLetters.includes(letterUpper)) {
@@ -309,7 +315,7 @@ io.on('connection', (socket) => {
   // Word Chain events
   socket.on('wordchain-submit', ({ roomId, word }, callback) => {
     const room = rooms.get(roomId);
-    if (!room || room.gameType !== 'wordchain') return;
+    if (!room || room.gameType !== 'wordchain' || !room.gameStarted) return;
     
     const wordUpper = word.toUpperCase().trim();
     const currentPlayer = room.players[room.currentPlayerIndex];
@@ -360,7 +366,7 @@ io.on('connection', (socket) => {
   // Trivia events
   socket.on('trivia-submit', ({ roomId, answer }, callback) => {
     const room = rooms.get(roomId);
-    if (!room || room.gameType !== 'trivia') return;
+    if (!room || room.gameType !== 'trivia' || !room.gameStarted) return;
     
     const answerUpper = answer.toUpperCase().trim();
     
