@@ -34,8 +34,8 @@ interface SocketContextType {
 
 const SocketContext = createContext<SocketContextType | null>(null);
 
-// Use environment variable or default to localhost for development
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+// Use environment variable or default to the deployed server
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://mini-games-server.onrender.com';
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
