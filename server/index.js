@@ -180,8 +180,13 @@ io.on('connection', (socket) => {
       room.currentQuestion = getRandomTriviaQuestion();
       room.triviaAnswers = {};
       room.triviaRevealed = false;
+      room.timeLeft = 20; // 20 seconds per trivia question
+    } else if (room.gameType === 'hangman') {
+      room.isDrawer = null;
+      room.currentWord = getRandomWord('hangman', room.category);
+      room.timeLeft = 60; // 60 seconds for Hangman
     }
-    room.timeLeft = room.roundTime;
+    room.timeLeft = room.roundTime || 80;
     
     io.to(roomId).emit('game-started', {
       room,
@@ -537,6 +542,53 @@ function handleLeave(socket) {
   socket.leave(roomId);
   console.log(`${socket.data.playerName} left room ${roomId}`);
 }
+
+// Game timer - runs every second for active games
+setInterval(() => {
+  rooms.forEach((room, roomId) => {
+    if (!room.gameStarted) return;
+    
+    // Decrement timer
+    if (room.timeLeft > 0) {
+      room.timeLeft--;
+      io.to(roomId).emit('timer-update', { timeLeft: room.timeLeft });
+    }
+    
+    // Handle time out for different games
+    if (room.timeLeft <= 0) {
+      if (room.gameType === 'scribble') {
+        // Time's up - move to next drawer/word
+        nextRound(roomId, room);
+      } else if (room.gameType === 'hangman') {
+        // Time's up - word not guessed
+        io.to(roomId).emit('hangman-round-over', {
+          word: room.currentWord,
+          winner: null,
+          round: room.round,
+          totalRounds: room.totalRounds,
+        });
+        nextHangmanRound(roomId, room);
+      } else if (room.gameType === 'trivia') {
+        // Time's up - reveal answer and move on
+        if (!room.triviaRevealed) {
+          room.triviaRevealed = true;
+          io.to(roomId).emit('trivia-reveal', { answer: room.currentQuestion.answer });
+          
+          io.to(roomId).emit('trivia-round-over', {
+            winner: null,
+            round: room.round,
+            totalRounds: room.totalRounds,
+          });
+          
+          setTimeout(() => {
+            nextTriviaRound(roomId, room);
+          }, 2000);
+        }
+      }
+      // Word Chain - no time limit, turn-based
+    }
+  });
+}, 1000);
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
