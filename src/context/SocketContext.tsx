@@ -180,6 +180,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       }]);
     });
 
+    socket.on('hangman-round-over', ({ word, winner, round, totalRounds }) => {
+      setCurrentWord(word);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        playerId: 'system',
+        playerName: '🎯',
+        message: winner 
+          ? `${winner.name} got it! (+100 pts) - Round ${round}/${totalRounds}`
+          : `Time's up! Word was: ${word} - Round ${round}/${totalRounds}`,
+        isCorrect: false,
+        timestamp: Date.now(),
+      }]);
+    });
+
     socket.on('hangman-game-over', ({ word, winner }) => {
       setIsGameStarted(false);
       setCurrentWord(word);

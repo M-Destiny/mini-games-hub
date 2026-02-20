@@ -218,12 +218,14 @@ io.on('connection', (socket) => {
     if (!isCorrect) {
       room.wrongGuesses++;
       if (room.wrongGuesses >= 6) {
-        // Game over - word revealed
-        io.to(roomId).emit('hangman-game-over', {
+        // Round over - move to next round or game over
+        io.to(roomId).emit('hangman-round-over', {
           word: room.currentWord,
           winner: null,
+          round: room.round,
+          totalRounds: room.totalRounds,
         });
-        room.gameStarted = false;
+        nextHangmanRound(roomId, room);
       }
     } else {
       // Check if won
@@ -232,11 +234,13 @@ io.on('connection', (socket) => {
         const player = room.players.find(p => p.id === socket.id);
         if (player) player.score += 100;
         
-        io.to(roomId).emit('hangman-game-over', {
+        io.to(roomId).emit('hangman-round-over', {
           word: room.currentWord,
           winner: { id: socket.id, name: socket.data.playerName, score: 100 },
+          round: room.round,
+          totalRounds: room.totalRounds,
         });
-        room.gameStarted = false;
+        nextHangmanRound(roomId, room);
       }
     }
     
@@ -272,6 +276,30 @@ function nextRound(roomId, room) {
     round: room.round,
     word: room.currentWord,
     timeLeft: room.timeLeft,
+  });
+}
+
+function nextHangmanRound(roomId, room) {
+  if (room.round >= room.totalRounds) {
+    // Game over - show final standings
+    room.gameStarted = false;
+    const winner = [...room.players].sort((a, b) => b.score - a.score)[0];
+    io.to(roomId).emit('game-over', {
+      winner,
+      scores: room.players,
+    });
+    return;
+  }
+  
+  // Next round
+  room.round++;
+  room.guessedLetters = [];
+  room.wrongGuesses = 0;
+  room.currentWord = getRandomWord('hangman', room.category);
+  
+  io.to(roomId).emit('next-round', {
+    round: room.round,
+    word: room.currentWord,
   });
 }
 

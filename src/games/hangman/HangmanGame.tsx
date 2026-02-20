@@ -105,6 +105,18 @@ export default function HangmanGame() {
     startGame();
   };
 
+  // Get round info from messages
+  const getRoundInfo = () => {
+    const msg = messages.find(m => m.message?.includes('Round'));
+    if (msg) {
+      const match = msg.message.match(/Round (\d+)\/(\d+)/);
+      if (match) return { current: parseInt(match[1]), total: parseInt(match[2]) };
+    }
+    return null;
+  };
+
+  const roundInfo = getRoundInfo();
+
   // Check for game over from messages
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
@@ -133,6 +145,11 @@ export default function HangmanGame() {
           <h1 className="text-lg font-bold">🏴 Hangman</h1>
           <span className="font-mono text-sm">{room.name}</span>
           <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-xs">{room.id}</span>
+          {roundInfo && (
+            <span className="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full text-xs">
+              R{roundInfo.current}/{roundInfo.total}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowHelp(true)} className="px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 text-sm">
@@ -149,10 +166,13 @@ export default function HangmanGame() {
         {/* Game Area */}
         <div className="flex-1 p-4 flex flex-col items-center">
           {/* Word */}
-          <div className="mb-4">
+          <div className="mb-4 text-center">
             <p className="text-gray-400 text-sm">Guess the word:</p>
             <p className="text-3xl font-bold tracking-widest mt-1">{getDisplayWord()}</p>
             <p className="text-red-400 text-sm mt-1">Wrong guesses: {wrongGuesses}/6</p>
+            {roundInfo && (
+              <p className="text-yellow-400 text-sm mt-1">Round {roundInfo.current} of {roundInfo.total}</p>
+            )}
           </div>
 
           {/* Canvas - Bigger size */}
@@ -163,9 +183,13 @@ export default function HangmanGame() {
             <div className={`p-4 rounded-xl text-center mb-4 ${winner ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30'}`}>
               <p className="text-xl font-bold">{winner ? `🎉 ${winner.name} wins!` : 'Game Over!'}</p>
               <p className="text-gray-300 mt-1">Word: {currentWord}</p>
-              <button onClick={handleStart} className="mt-3 px-6 py-2 bg-emerald-500 hover:bg-emerald-400 rounded-lg font-bold">
-                Play Again
-              </button>
+              {roundInfo && roundInfo.current < roundInfo.total ? (
+                <p className="text-yellow-400 mt-2">Next round coming...</p>
+              ) : (
+                <button onClick={handleStart} className="mt-3 px-6 py-2 bg-emerald-500 hover:bg-emerald-400 rounded-lg font-bold">
+                  Play Again
+                </button>
+              )}
             </div>
           )}
 
