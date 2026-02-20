@@ -7,9 +7,12 @@ import CreateHangmanRoom from './pages/CreateHangmanRoom';
 import JoinHangmanRoom from './pages/JoinHangmanRoom';
 import CreateWordChainRoom from './pages/CreateWordChainRoom';
 import JoinWordChainRoom from './pages/JoinWordChainRoom';
+import CreateTriviaRoom from './pages/CreateTriviaRoom';
+import JoinTriviaRoom from './pages/JoinTriviaRoom';
 import ScribbleGame from './games/scribble/ScribbleGame';
 import HangmanGame from './games/hangman/HangmanGame';
 import WordChainGame from './games/wordchain/WordChainGame';
+import TriviaGame from './games/trivia/TriviaGame';
 
 function App() {
   return (
@@ -35,6 +38,12 @@ function App() {
           <Route path="/wordchain/create" element={<CreateWordChainRoom />} />
           <Route path="/wordchain/join" element={<JoinWordChainRoom />} />
           <Route path="/wordchain/room" element={<WordChainGame />} />
+          
+          {/* Trivia Quiz */}
+          <Route path="/trivia" element={<Navigate to="/trivia/create" />} />
+          <Route path="/trivia/create" element={<CreateTriviaRoom />} />
+          <Route path="/trivia/join" element={<JoinTriviaRoom />} />
+          <Route path="/trivia/room" element={<TriviaGame />} />
         </Routes>
       </BrowserRouter>
     </SocketProvider>

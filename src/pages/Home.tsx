@@ -34,8 +34,8 @@ const games = [
     description: 'Test your knowledge in group quizzes!',
     icon: '❓',
     color: 'from-amber-500 to-orange-500',
-    status: 'Coming Soon',
-    link: '#',
+    status: 'Ready',
+    link: '/trivia',
   },
 ];
 

@@ -41,8 +41,13 @@ Connect words with your friends!
 - Configurable rounds (1-6)
 - Multiplayer support
 
-### 🚧 Coming Soon
-- Trivia Quiz
+### ✅ Trivia Quiz (Ready!)
+Test your knowledge with friends!
+- Multiple choice questions (A, B, C, D)
+- 100 points for correct answer
+- Fastest correct answer wins the round
+- 15 questions in pool
+- Configurable rounds (5, 10, 15, 20)
 
 ## 🛠️ Tech Stack
 
@@ -82,14 +87,17 @@ mini-games-hub/
 │   ├── games/
 │   │   ├── scribble/              # Scribble game
 │   │   ├── hangman/               # Hangman game
-│   │   └── wordchain/             # Word Chain game
+│   │   ├── wordchain/             # Word Chain game
+│   │   └── trivia/                # Trivia Quiz game
 │   ├── pages/                    # Create/Join pages
 │   │   ├── CreateRoom.tsx         # Scribble room
 │   │   ├── JoinRoom.tsx          # Scribble join
 │   │   ├── CreateHangmanRoom.tsx # Hangman room
 │   │   ├── JoinHangmanRoom.tsx   # Hangman join
 │   │   ├── CreateWordChainRoom.tsx # Word Chain room
-│   │   └── JoinWordChainRoom.tsx   # Word Chain join
+│   │   ├── JoinWordChainRoom.tsx   # Word Chain join
+│   │   ├── CreateTriviaRoom.tsx    # Trivia room
+│   │   └── JoinTriviaRoom.tsx      # Trivia join
 │   └── App.tsx                   # Routing
 ├── server/
 │   └── index.js                  # Socket.io server
