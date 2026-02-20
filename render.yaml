@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: mini-games-server
+    env: node
+    region: oregon
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
