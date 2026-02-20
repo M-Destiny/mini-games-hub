@@ -35,10 +35,11 @@ interface SocketContextType {
 const SocketContext = createContext<SocketContextType | null>(null);
 
 // Use environment variable or default to the deployed server
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://mini-games-server.onrender.com';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://mini-games-hub.onrender.com';
 
 export function SocketProvider({ children }: { children: ReactNode }) {
   const socketRef = useRef<Socket | null>(null);
+  const lastDrawPointRef = useRef<{ x: number; y: number } | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
@@ -85,6 +86,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setTimeLeft(t);
       setIsDrawer(drawerId === socket.id);
       setMessages([]);
+      lastDrawPointRef.current = null;
     });
 
     socket.on('next-round', ({ round: r, drawerId, word, timeLeft: t }) => {
@@ -92,6 +94,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setCurrentWord(word);
       setTimeLeft(t);
       setIsDrawer(drawerId === socket.id);
+      lastDrawPointRef.current = null;
     });
 
     socket.on('timer-update', ({ timeLeft: t }) => {
@@ -109,16 +112,31 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
 
     socket.on('draw', (point: DrawingPoint) => {
-      // Handle incoming drawing from other players
+      // Handle incoming drawing from other players - draw smooth lines
       const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       
-      ctx.fillStyle = point.color;
-      ctx.beginPath();
-      ctx.arc(point.x, point.y, point.width / 2, 0, Math.PI * 2);
-      ctx.fill();
+      // Draw line from last point to current point for smooth drawing
+      if (lastDrawPointRef.current) {
+        ctx.strokeStyle = point.color;
+        ctx.lineWidth = point.width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(lastDrawPointRef.current.x, lastDrawPointRef.current.y);
+        ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+      } else {
+        // First point - draw a dot
+        ctx.fillStyle = point.color;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, point.width / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      lastDrawPointRef.current = { x: point.x, y: point.y };
     });
 
     socket.on('game-over', ({ winner, scores }) => {
