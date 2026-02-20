@@ -20,7 +20,10 @@ Draw and guess words with your friends! Features:
 - Custom word lists
 - Configurable rounds (1-6)
 - Configurable time per round (30s - 120s)
-- Drawing tools: colors & brush sizes
+- Drawing tools: 12 colors & 5 brush sizes
+- Clear canvas option
+- Real-time drawing sync
+- Score tracking
 - Responsive design for all devices
 
 ### 🚧 Coming Soon
@@ -32,7 +35,7 @@ Draw and guess words with your friends! Features:
 
 - **Frontend:** React + TypeScript + Vite
 - **Styling:** Tailwind CSS
-- **Real-time:** Socket.io (backend)
+- **Real-time:** Socket.io (backend needed for multiplayer)
 - **Deployment:** Vercel
 
 ## 🚀 Getting Started
@@ -63,29 +66,76 @@ npm run build
 
 The built files will be in the `dist` folder.
 
-## 📡 API Endpoints
+## 📱 Quick Start
 
-When running the backend server:
-
-| Endpoint | Description |
-|----------|-------------|
-| `WS /socket.io` | Real-time game communication |
+1. **Create a Room** - Click "Create Room" and enter your name
+2. **Customize** - Choose rounds, time per round, and add custom words (optional)
+3. **Share** - Copy the room link and share with friends
+4. **Join** - Friends click the link and enter their name
+5. **Start** - At least 1 player needed to start (demo mode)
+6. **Draw & Guess** - Draw the word, others guess!
 
 ## 🎮 How to Play Scribble
 
-1. **Create a Room** - Click "Create Room" and set your name
-2. **Customize** - Choose number of rounds, time per round, and custom words (optional)
-3. **Share** - Copy the room link and share with friends
-4. **Join** - Friends click the link and enter their name
-5. **Start** - At least 2 players needed to start
-6. **Draw & Guess** - One player draws, others guess!
+### As Drawer:
+1. You'll see the word to draw
+2. Use colors and brush sizes to draw
+3. Players will guess in the chat
+4. Correct guesses earn points!
 
-## 📝 Configuration
+### As Guesser:
+1. Watch the drawing carefully
+2. Type your guess in the chat
+3. First to guess correctly wins points!
+4. Points = time remaining × 10
 
-### Game Settings (in CreateRoom)
-- **Rounds:** 1-6 rounds
-- **Time per Round:** 30s, 60s, 80s, 100s, or 120s
-- **Custom Words:** Optional comma-separated list
+## ⚙️ Game Settings
+
+| Setting | Options | Default |
+|---------|---------|---------|
+| Rounds | 1, 2, 3, 4, 5, 6 | 3 |
+| Time per Round | 30s, 60s, 80s, 100s, 120s | 80s |
+| Custom Words | Any comma-separated list | Default word list |
+
+## 📁 Project Structure
+
+```
+mini-games-hub/
+├── src/
+│   ├── context/
+│   │   └── SocketContext.tsx    # Real-time state management
+│   ├── games/
+│   │   └── scribble/
+│   │       └── ScribbleGame.tsx # Main game component
+│   ├── pages/
+│   │   ├── Home.tsx            # Game selection hub
+│   │   ├── CreateRoom.tsx      # Room creation + settings
+│   │   └── JoinRoom.tsx        # Join existing room
+│   ├── types/
+│   │   └── index.ts            # TypeScript interfaces
+│   ├── App.tsx                 # Main app with routing
+│   └── main.tsx                # Entry point
+├── public/
+├── index.html
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+└── tailwind.config.js
+```
+
+## 🔧 Backend (For Real Multiplayer)
+
+To enable real multiplayer across different devices, you'll need to set up a Socket.io backend. A separate server will handle:
+- Room management
+- Player synchronization
+- Drawing broadcast
+- Game state management
+- Score tracking
+
+### Quick Deploy Backend Options:
+- **Render** - Free tier available
+- **Railway** - Pay as you go
+- **Fly.io** - Global deployment
 
 ## 🤝 Contributing
 
@@ -95,7 +145,7 @@ When running the backend server:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## 📝 License
 
 This project is licensed under the MIT License.
 
