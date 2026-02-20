@@ -62,6 +62,46 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [wrongGuesses, setWrongGuesses] = useState(0);
   const [gameSettings, setGameSettings] = useState<GameSettings | null>(null);
 
+  // Save room data to sessionStorage
+  const saveRoomData = (roomData: { roomId: string; playerName: string; gameType: string }) => {
+    sessionStorage.setItem('roomData', JSON.stringify(roomData));
+  };
+
+  const clearRoomData = () => {
+    sessionStorage.removeItem('roomData');
+  };
+
+  // Try to reconnect to room on connect
+  const tryReconnect = () => {
+    const saved = sessionStorage.getItem('roomData');
+    if (saved && socketRef.current) {
+      try {
+        const { roomId, playerName, gameType } = JSON.parse(saved);
+        if (roomId && playerName) {
+          console.log('Attempting to reconnect to room:', roomId);
+          socketRef.current.emit('join-room', { roomId, playerName }, (response: any) => {
+            if (response.success) {
+              console.log('Reconnected to room!');
+              setRoom(response.room);
+              setCurrentPlayer({ id: response.playerId, name: playerName, score: 0, isReady: true });
+              setPlayers(response.room.players);
+              setIsHost(response.room.hostId === response.playerId);
+              if (gameType) {
+                // @ts-ignore
+                socket.data.gameType = gameType;
+              }
+            } else {
+              console.log('Failed to reconnect:', response.error);
+              clearRoomData();
+            }
+          });
+        }
+      } catch (e) {
+        console.log('Error parsing saved room data');
+      }
+    }
+  };
+
   useEffect(() => {
     // Connect to socket server
     const socket = io(SOCKET_URL, {
@@ -72,6 +112,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.on('connect', () => {
       console.log('Connected to server');
       setIsConnected(true);
+      tryReconnect();
     });
 
     socket.on('disconnect', () => {
@@ -239,6 +280,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
           rounds: settings?.rounds || 3,
           roundTime: settings?.roundTime || 80,
         });
+        saveRoomData({ roomId: response.room.id, playerName, gameType });
       }
     });
   };
@@ -257,6 +299,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
           rounds: response.room.totalRounds || 3,
           roundTime: response.room.roundTime || 80,
         });
+        saveRoomData({ roomId: response.room.id, playerName, gameType: gameType || 'scribble' });
       } else {
         alert(response.error || 'Failed to join room');
       }
@@ -274,6 +317,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     setCurrentWord('');
     setRound(1);
     setIsHost(false);
+    clearRoomData();
   };
 
   const startGame = () => {
