@@ -10,25 +10,25 @@ const io = new Server(httpServer, {
 });
 
 // Game state
-interface Player {
-  id: string;
-  name: string;
-  score: number;
-}
+// interface Player {
+//   id: string;
+//   name: string;
+//   score: number;
+// }
 
-interface Room {
-  id: string;
-  name: string;
-  players: Player[];
-  gameStarted: boolean;
-  currentWord: string | null;
-  isDrawer: string | null;
-  round: number;
-  totalRounds: number;
-  roundTime: number;
-  timeLeft: number;
-  customWords: string[];
-}
+// interface Room {
+//   id: string;
+//   name: string;
+//   players: Player[];
+//   gameStarted: boolean;
+//   currentWord: string | null;
+//   isDrawer: string | null;
+//   round: number;
+//   totalRounds: number;
+//   roundTime: number;
+//   timeLeft: number;
+//   customWords: string[];
+// }
 
 const rooms = new Map<string, Room>();
 
