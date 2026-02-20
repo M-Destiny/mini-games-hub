@@ -48,7 +48,7 @@ export default function Home() {
           <p className="text-xl md:text-2xl text-white/80 mb-8 max-w-2xl mx-auto">
             Play multiplayer games with friends! Just share the link and start playing. No downloads needed.
           </p>
-          <div className="flex items-center justify-center gap-4 text-sm text-white/60">
+          <div className="flex items-center justify-center gap-4 text-sm text-white/60 flex-wrap">
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
               Free to Play
@@ -130,7 +130,8 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-8 text-center text-gray-500 text-sm">
-        <p>Made with ❤️ by Destiny & Clawe 🐾</p>
+        <p className="mb-2">Made with ❤️ by Destiny & Clawe 🐾</p>
+        <p className="text-xs">The best assistant in the world</p>
       </footer>
     </div>
   );

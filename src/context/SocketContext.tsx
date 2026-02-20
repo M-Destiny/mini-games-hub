@@ -1,6 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-// import { io, Socket } from 'socket.io-client';
 import type { Player, Room, DrawingPoint, ChatMessage } from '../types';
+
+interface GameSettings {
+  customWords: string[];
+  rounds: number;
+  roundTime: number;
+}
 
 interface SocketContextType {
   socket: unknown;
@@ -14,9 +19,10 @@ interface SocketContextType {
   round: number;
   isDrawer: boolean;
   isGameStarted: boolean;
+  gameSettings: GameSettings | null;
   
   // Actions
-  createRoom: (playerName: string, roomName: string) => void;
+  createRoom: (playerName: string, roomName: string, settings?: Partial<GameSettings>) => void;
   joinRoom: (roomId: string, playerName: string) => void;
   leaveRoom: () => void;
   startGame: () => void;
@@ -25,10 +31,16 @@ interface SocketContextType {
   sendMessage: (message: string) => void;
 }
 
+const DEFAULT_WORDS = [
+  'apple', 'banana', 'car', 'dog', 'elephant', 'flower', 'guitar', 'house',
+  'island', 'jungle', 'kite', 'lamp', 'mountain', 'notebook', 'ocean', 'pizza',
+  'queen', 'rainbow', 'sunflower', 'tree', 'umbrella', 'volcano', 'waterfall', 'xylophone',
+  'yacht', 'zebra', 'airplane', 'butterfly', 'castle', 'dragon', 'fireworks', 'galaxy',
+];
+
 const SocketContext = createContext<SocketContextType | null>(null);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
-  // const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
@@ -36,24 +48,21 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentWord, setCurrentWord] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
-  // const [round, setRound] = useState(1);
+  const [round, setRound] = useState(1);
   const [isDrawer, setIsDrawer] = useState(false);
   const [isGameStarted, setIsGameStarted] = useState(false);
+  const [gameSettings, setGameSettings] = useState<GameSettings | null>(null);
 
   useEffect(() => {
-    // In production, connect to socket server
-    // const newSocket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001');
-    // setSocket(newSocket);
-    
-    // For now, we'll use a mock mode
     setIsConnected(true);
-    
-    // return () => {
-    //   socket?.disconnect();
-    // };
   }, []);
 
-  const createRoom = (playerName: string, roomName: string) => {
+  const getRandomWord = () => {
+    const words = gameSettings?.customWords || DEFAULT_WORDS;
+    return words[Math.floor(Math.random() * words.length)].toUpperCase();
+  };
+
+  const createRoom = (playerName: string, roomName: string, settings?: Partial<GameSettings>) => {
     const newPlayer: Player = {
       id: 'player-' + Math.random().toString(36).substr(2, 9),
       name: playerName,
@@ -69,9 +78,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       gameStarted: false,
     };
     
+    const finalSettings: GameSettings = {
+      customWords: settings?.customWords || DEFAULT_WORDS,
+      rounds: settings?.rounds || 3,
+      roundTime: settings?.roundTime || 80,
+    };
+    
     setRoom(newRoom);
     setCurrentPlayer(newPlayer);
     setPlayers([newPlayer]);
+    setGameSettings(finalSettings);
   };
 
   const joinRoom = (roomId: string, playerName: string) => {
@@ -82,7 +98,6 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       isReady: true,
     };
     
-    // In real app, this would come from server
     const existingRoom: Room = {
       id: roomId,
       name: 'Room ' + roomId,
@@ -94,6 +109,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     setRoom(existingRoom);
     setCurrentPlayer(newPlayer);
     setPlayers([newPlayer]);
+    
+    // Try to load settings from session
+    const stored = sessionStorage.getItem('gameSettings');
+    if (stored) {
+      try {
+        setGameSettings(JSON.parse(stored));
+      } catch {
+        // Ignore
+      }
+    }
   };
 
   const leaveRoom = () => {
@@ -103,18 +128,19 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     setMessages([]);
     setIsGameStarted(false);
     setCurrentWord('');
+    setRound(1);
+    sessionStorage.removeItem('gameSettings');
   };
 
   const startGame = () => {
     setIsGameStarted(true);
-    // Start first round as drawer
     setIsDrawer(true);
-    setCurrentWord('EXAMPLE');
-    setTimeLeft(80);
+    setCurrentWord(getRandomWord());
+    setTimeLeft(gameSettings?.roundTime || 80);
+    setRound(1);
   };
 
   const sendDraw = (point: DrawingPoint) => {
-    // In real app, emit to socket
     console.log('Drawing:', point);
   };
 
@@ -129,6 +155,18 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, msg]);
+      
+      // Update score
+      setPlayers(prev => prev.map(p => 
+        p.id === currentPlayer?.id 
+          ? { ...p, score: p.score + (gameSettings?.roundTime || 80) * 10 }
+          : p
+      ));
+      
+      // Next round after delay
+      setTimeout(() => {
+        nextRound();
+      }, 2000);
     } else {
       const msg: ChatMessage = {
         id: Date.now().toString(),
@@ -141,6 +179,48 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setMessages(prev => [...prev, msg]);
     }
   };
+
+  const nextRound = () => {
+    const currentRoundNum = round;
+    const totalRounds = gameSettings?.rounds || 3;
+    
+    if (currentRoundNum >= totalRounds) {
+      // Game over - find winner
+      const winner = [...players].sort((a, b) => b.score - a.score)[0];
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        playerId: 'system',
+        playerName: '🎉',
+        message: `Game Over! ${winner?.name || 'Unknown'} wins with ${winner?.score || 0} points!`,
+        isCorrect: false,
+        timestamp: Date.now(),
+      }]);
+      setIsGameStarted(false);
+      return;
+    }
+    
+    setRound(currentRoundNum + 1);
+    setIsDrawer(!isDrawer);
+    setCurrentWord(getRandomWord());
+    setTimeLeft(gameSettings?.roundTime || 80);
+  };
+
+  // Timer countdown
+  useEffect(() => {
+    if (!isGameStarted || timeLeft <= 0) return;
+    
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          nextRound();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [isGameStarted, timeLeft, round, isDrawer]);
 
   const sendMessage = (message: string) => {
     const msg: ChatMessage = {
@@ -164,9 +244,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       messages,
       currentWord,
       timeLeft,
-      round: 1,
+      round,
       isDrawer,
       isGameStarted,
+      gameSettings,
       createRoom,
       joinRoom,
       leaveRoom,
