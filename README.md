@@ -1,152 +1,73 @@
-# 🎮 Mini Games Hub
+# React + TypeScript + Vite
 
-A collection of multiplayer mini games that can be played with friends via shareable links. No downloads, no accounts - just play!
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Vercel](https://vercelbadge.vercel.app/api/M-Destiny/mini-games-hub)
-![Status](https://img.shields.io/badge/status-In%20Development-yellow)
+Currently, two official plugins are available:
 
-## ✨ Features
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-- 🎯 **Real-time Multiplayer** - Play with friends in real-time
-- 🔗 **Shareable Links** - Just share the room link to invite friends
-- 👥 **No Player Limit** - Anyone can join!
-- 🎨 **Beautiful UI** - Clean, modern design
-- 📱 **Responsive** - Works on desktop and mobile
+## React Compiler
 
-## 🎮 Available Games
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-### 1. Scribble (Coming Soon)
-- Draw and guess words with your friends
-- Multiple rounds with different drawers
-- Timer-based gameplay
-- Score tracking
+## Expanding the ESLint configuration
 
-### 2. Word Chain (Coming Soon)
-- Connect words by matching last letter
-- Fast-paced group game
-- Multiple difficulty levels
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
 
-### 3. Trivia Quiz (Coming Soon)
-- Group quiz competitions
-- Multiple categories
-- Score leaderboards
+```js
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
 
-### 4. Hangman (Coming Soon)
-- Classic word guessing game
-- Play together in groups
-- Hint system
+      // Remove tseslint.configs.recommended and replace with this
+      tseslint.configs.recommendedTypeChecked,
+      // Alternatively, use this for stricter rules
+      tseslint.configs.strictTypeChecked,
+      // Optionally, add this for stylistic rules
+      tseslint.configs.stylisticTypeChecked,
 
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js (v18 or higher)
-- npm or yarn
-
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/M-Destiny/mini-games-hub.git
-cd mini-games-hub
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
+      // Other configs...
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
 
-### Environment Variables
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-Create a `.env` file:
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
 
-```env
-VITE_SOCKET_URL=http://localhost:3001
+export default defineConfig([
+  globalIgnores(['dist']),
+  {
+    files: ['**/*.{ts,tsx}'],
+    extends: [
+      // Other configs...
+      // Enable lint rules for React
+      reactX.configs['recommended-typescript'],
+      // Enable lint rules for React DOM
+      reactDom.configs.recommended,
+    ],
+    languageOptions: {
+      parserOptions: {
+        project: ['./tsconfig.node.json', './tsconfig.app.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+      // other options...
+    },
+  },
+])
 ```
-
-### Building for Production
-
-```bash
-# Build frontend
-npm run build
-
-# Preview production build
-npm run preview
-```
-
-## 🏗️ Project Structure
-
-```
-mini-games-hub/
-├── src/
-│   ├── components/        # Shared components
-│   │   ├── GameCard.tsx
-│   │   ├── Lobby.tsx
-│   │   ├── Room.tsx
-│   │   └── Navbar.tsx
-│   ├── games/            # Game-specific code
-│   │   ├── scribble/
-│   │   ├── wordchain/
-│   │   ├── trivia/
-│   │   └── hangman/
-│   ├── hooks/            # Custom React hooks
-│   │   ├── useSocket.ts
-│   │   └── useGameState.ts
-│   ├── pages/
-│   │   ├── Home.tsx
-│   │   ├── Game.tsx
-│   │   └── CreateRoom.tsx
-│   ├── styles/           # Global styles
-│   └── utils/            # Utility functions
-├── server/               # Backend server
-│   ├── index.js
-│   ├── rooms.js
-│   └── games/
-└── public/              # Static assets
-```
-
-## 🎯 How to Play
-
-### Creating a Room
-1. Visit the homepage
-2. Click on a game you want to play
-3. Click "Create Room"
-4. Share the generated link with friends
-
-### Joining a Room
-1. Open the room link shared by a friend
-2. Enter your display name
-3. Wait for the host to start the game
-
-## 🛠️ Tech Stack
-
-- **Frontend:** React, TypeScript, Vite
-- **Styling:** Tailwind CSS
-- **Real-time:** Socket.io
-- **Backend:** Node.js, Express
-- **Deployment:** Vercel (frontend), Render (backend)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) first.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-game`)
-3. Commit your changes (`git commit -m 'Add amazing game'`)
-4. Push to the branch (`git push origin feature/amazing-game`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- [Socket.io](https://socket.io/) for real-time communication
-- [Vercel](https://vercel.com/) for hosting
-- All contributors and players!
-
----
-
-<p align="center">Made with ❤️ by Destiny & Clawe 🐾</p>
