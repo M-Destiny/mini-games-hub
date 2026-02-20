@@ -1,12 +1,8 @@
 services:
   - type: web
     name: mini-games-server
-    repo: https://github.com/M-Destiny/mini-games-hub.git
     env: node
     region: oregon
-    buildCommand: cd server && npm install
-    startCommand: cd server && node index.js
+    buildCommand: npm install
+    startCommand: npm start
     rootDirectory: server
-    envVars:
-      - key: NODE_ENV
-        value: production

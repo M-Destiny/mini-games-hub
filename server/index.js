@@ -1,5 +1,5 @@
-import { Server } from 'socket.io';
-import { createServer } from 'http';
+const { Server } = require('socket.io');
+const { createServer } = require('http');
 
 const httpServer = createServer();
 const io = new Server(httpServer, {
@@ -10,27 +10,7 @@ const io = new Server(httpServer, {
 });
 
 // Game state
-interface Player {
-  id: string;
-  name: string;
-  score: number;
-}
-
-interface Room {
-  id: string;
-  name: string;
-  players: Player[];
-  gameStarted: boolean;
-  currentWord: string | null;
-  isDrawer: string | null;
-  round: number;
-  totalRounds: number;
-  roundTime: number;
-  timeLeft: number;
-  customWords: string[];
-}
-
-const rooms = new Map<string, Room>();
+const rooms = new Map();
 
 const DEFAULT_WORDS = [
   'apple', 'banana', 'car', 'dog', 'elephant', 'flower', 'guitar', 'house',
@@ -38,7 +18,7 @@ const DEFAULT_WORDS = [
   'queen', 'rainbow', 'sunflower', 'tree', 'umbrella', 'volcano', 'waterfall', 'xylophone',
 ];
 
-function getRandomWord(words: string[]) {
+function getRandomWord(words) {
   return words[Math.floor(Math.random() * words.length)].toUpperCase();
 }
 
@@ -48,7 +28,7 @@ io.on('connection', (socket) => {
   socket.on('create-room', ({ playerName, roomName, settings }, callback) => {
     const roomId = Math.random().toString(36).substr(2, 6).toUpperCase();
     
-    const room: Room = {
+    const room = {
       id: roomId,
       name: roomName,
       players: [{
@@ -98,7 +78,6 @@ io.on('connection', (socket) => {
     socket.data.roomId = roomId;
     socket.data.playerName = playerName;
     
-    // Notify others
     io.to(roomId).emit('player-joined', { 
       players: room.players,
       playerId: socket.id,
@@ -136,29 +115,10 @@ io.on('connection', (socket) => {
       timeLeft: room.timeLeft,
     });
     
-    // Start timer
-    const timer = setInterval(() => {
-      const r = rooms.get(roomId);
-      if (!r || !r.gameStarted) {
-        clearInterval(timer);
-        return;
-      }
-      
-      r.timeLeft--;
-      
-      if (r.timeLeft <= 0) {
-        // Next round
-        nextRound(roomId, r);
-      }
-      
-      io.to(roomId).emit('timer-update', { timeLeft: r.timeLeft });
-    }, 1000);
-    
     callback({ success: true });
   });
 
   socket.on('draw', ({ roomId, point }) => {
-    // Broadcast drawing to other players in room
     socket.to(roomId).emit('draw', point);
   });
 
@@ -168,7 +128,6 @@ io.on('connection', (socket) => {
     
     const isCorrect = guess.toUpperCase() === room.currentWord?.toUpperCase();
     
-    // Broadcast guess to all
     io.to(roomId).emit('new-message', {
       id: Date.now().toString(),
       playerId: socket.id,
@@ -178,7 +137,6 @@ io.on('connection', (socket) => {
     });
     
     if (isCorrect) {
-      // Calculate score
       const points = room.timeLeft * 10;
       const player = room.players.find(p => p.id === socket.id);
       if (player) {
@@ -192,7 +150,6 @@ io.on('connection', (socket) => {
         word: room.currentWord,
       });
       
-      // Next round
       nextRound(roomId, room);
     }
     
@@ -208,10 +165,8 @@ io.on('connection', (socket) => {
   });
 });
 
-function nextRound(roomId: string, room: Room) {
-  // Check if game over
+function nextRound(roomId, room) {
   if (room.round >= room.totalRounds) {
-    // Game over
     room.gameStarted = false;
     const winner = [...room.players].sort((a, b) => b.score - a.score)[0];
     
@@ -222,9 +177,7 @@ function nextRound(roomId: string, room: Room) {
     return;
   }
   
-  // Next round
   room.round++;
-  // Rotate drawer
   const currentDrawerIndex = room.players.findIndex(p => p.id === room.isDrawer);
   room.isDrawer = room.players[(currentDrawerIndex + 1) % room.players.length].id;
   room.currentWord = getRandomWord(room.customWords);
@@ -238,22 +191,19 @@ function nextRound(roomId: string, room: Room) {
   });
 }
 
-function handleLeave(socket: any) {
+function handleLeave(socket) {
   const roomId = socket.data.roomId;
   if (!roomId) return;
   
   const room = rooms.get(roomId);
   if (!room) return;
   
-  // Remove player
   room.players = room.players.filter(p => p.id !== socket.id);
   
   if (room.players.length === 0) {
-    // Delete room
     rooms.delete(roomId);
     console.log(`Room ${roomId} deleted (empty)`);
   } else {
-    // If drawer left, assign new drawer
     if (room.isDrawer === socket.id && room.gameStarted) {
       room.isDrawer = room.players[0].id;
     }
@@ -271,5 +221,5 @@ function handleLeave(socket: any) {
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
-  console.log(`🎮 Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
