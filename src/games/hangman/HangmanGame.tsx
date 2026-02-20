@@ -3,23 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../context/SocketContext';
 
 const HANGMAN_PARTS = [
-  // Head
   (ctx: CanvasRenderingContext2D, x: number, y: number) => { ctx.beginPath(); ctx.arc(x, y - 40, 20, 0, Math.PI * 2); ctx.stroke(); },
-  // Body
   (ctx: CanvasRenderingContext2D, x: number, y: number) => { ctx.beginPath(); ctx.moveTo(x, y - 20); ctx.lineTo(x, y + 30); ctx.stroke(); },
-  // Left Arm
   (ctx: CanvasRenderingContext2D, x: number, y: number) => { ctx.beginPath(); ctx.moveTo(x, y - 10); ctx.lineTo(x - 20, y + 15); ctx.stroke(); },
-  // Right Arm
   (ctx: CanvasRenderingContext2D, x: number, y: number) => { ctx.beginPath(); ctx.moveTo(x, y - 10); ctx.lineTo(x + 20, y + 15); ctx.stroke(); },
-  // Left Leg
   (ctx: CanvasRenderingContext2D, x: number, y: number) => { ctx.beginPath(); ctx.moveTo(x, y + 30); ctx.lineTo(x - 15, y + 55); ctx.stroke(); },
-  // Right Leg
   (ctx: CanvasRenderingContext2D, x: number, y: number) => { ctx.beginPath(); ctx.moveTo(x, y + 30); ctx.lineTo(x + 15, y + 55); ctx.stroke(); },
 ];
+
+const HOW_TO_PLAY = {
+  title: "How to Play Hangman",
+  steps: [
+    "One person thinks of a word.",
+    "The word is shown as blank lines (one for each letter).",
+    "Everyone else takes turns guessing letters.",
+    "If you guess a wrong letter, the hangman starts to appear.",
+    "You only get 6 wrong guesses!",
+    "If you guess the word before 6 wrong guesses, you win!",
+    "The person who guesses correctly gets 100 points!"
+  ]
+};
 
 export default function HangmanGame() {
   const navigate = useNavigate();
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const { 
     room, players, currentPlayer, messages, currentWord,
     isGameStarted, isHost, guessedLetters, wrongGuesses,
@@ -126,9 +134,14 @@ export default function HangmanGame() {
           <span className="font-mono text-sm">{room.name}</span>
           <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-xs">{room.id}</span>
         </div>
-        <button onClick={handleLeave} className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 text-sm">
-          ✕ Exit
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowHelp(true)} className="px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 text-sm">
+            ❓ How to Play
+          </button>
+          <button onClick={handleLeave} className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 text-sm">
+            ✕ Exit
+          </button>
+        </div>
       </header>
 
       {/* Main */}
@@ -142,8 +155,8 @@ export default function HangmanGame() {
             <p className="text-red-400 text-sm mt-1">Wrong guesses: {wrongGuesses}/6</p>
           </div>
 
-          {/* Canvas */}
-          <canvas ref={canvasRef} width={200} height={180} className="bg-white rounded-xl mb-4" />
+          {/* Canvas - Bigger size */}
+          <canvas ref={canvasRef} width={350} height={300} className="bg-white rounded-xl mb-4 w-full max-w-[350px]" />
 
           {/* Game Over */}
           {isGameOver && (
@@ -248,6 +261,37 @@ export default function HangmanGame() {
                 Waiting for host...
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* How to Play Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowHelp(false)}>
+          <div className="bg-gray-800 rounded-2xl p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-4 text-center">❓ How to Play Hangman</h2>
+            
+            <div className="space-y-4 text-gray-300">
+              <p className="text-lg">Anyone can play! Here's how:</p>
+              <ol className="list-decimal list-inside space-y-3">
+                {HOW_TO_PLAY.steps.map((step, i) => (
+                  <li key={i} className="text-base">{step}</li>
+                ))}
+              </ol>
+              
+              <div className="mt-6 p-4 bg-yellow-500/20 rounded-lg">
+                <p className="text-yellow-300 font-bold">💡 Tips:</p>
+                <ul className="list-disc list-inside mt-2 text-sm">
+                  <li>Guess vowels first (A, E, I, O, U)</li>
+                  <li>Common letters like S, T, R, N are good too!</li>
+                  <li>Work together to solve the word fast!</li>
+                </ul>
+              </div>
+            </div>
+
+            <button onClick={() => setShowHelp(false)} className="w-full mt-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 rounded-lg font-bold">
+              Got it! Let's Play! 🎮
+            </button>
           </div>
         </div>
       )}

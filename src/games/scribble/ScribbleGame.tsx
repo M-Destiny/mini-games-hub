@@ -10,8 +10,22 @@ const COLORS = [
 
 const BRUSH_SIZES = [4, 6, 10, 16, 24];
 
+const HOW_TO_PLAY_SCRIBBLE = {
+  title: "How to Play Scribble",
+  steps: [
+    "One person gets a word to draw.",
+    "They use the drawing tools to draw the word.",
+    "Everyone else tries to guess what it is!",
+    "Type your guess in the chat box.",
+    "First person to guess correctly wins points!",
+    "Points = time left × 10",
+    "Take turns drawing - whoever gets most points wins!"
+  ]
+};
+
 export default function ScribbleGame() {
   const navigate = useNavigate();
+  const [showHelp, setShowHelp] = useState(false);
   const { 
     room, 
     players, 
@@ -210,6 +224,9 @@ export default function ScribbleGame() {
         </div>
         
         <div className="flex items-center gap-3">
+          <button onClick={() => setShowHelp(true)} className="px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 text-sm">
+            ❓ How to Play
+          </button>
           {isGameStarted && (
             <div className="flex items-center gap-2 bg-gray-700 px-3 py-1 rounded-lg">
               <span className="text-xl">⏱️</span>
@@ -386,6 +403,38 @@ export default function ScribbleGame() {
                 Waiting for host to start...
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* How to Play Modal */}
+      {showHelp && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowHelp(false)}>
+          <div className="bg-gray-800 rounded-2xl p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-4 text-center">🎨 How to Play Scribble</h2>
+            
+            <div className="space-y-4 text-gray-300">
+              <p className="text-lg">Easy to learn, fun to play!</p>
+              <ol className="list-decimal list-inside space-y-3">
+                {HOW_TO_PLAY_SCRIBBLE.steps.map((step, i) => (
+                  <li key={i} className="text-base">{step}</li>
+                ))}
+              </ol>
+              
+              <div className="mt-6 p-4 bg-purple-500/20 rounded-lg">
+                <p className="text-purple-300 font-bold">🎯 Drawing Tips:</p>
+                <ul className="list-disc list-inside mt-2 text-sm">
+                  <li>Use simple shapes to represent objects</li>
+                  <li>Draw key parts of the word</li>
+                  <li>Don't worry about being an artist!</li>
+                  <li>Use colors to make it clearer</li>
+                </ul>
+              </div>
+            </div>
+
+            <button onClick={() => setShowHelp(false)} className="w-full mt-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg font-bold">
+              Let's Play! 🎮
+            </button>
           </div>
         </div>
       )}
