@@ -20,6 +20,7 @@ interface SocketContextType {
   round: number;
   isDrawer: boolean;
   isGameStarted: boolean;
+  isHost: boolean;
   gameSettings: GameSettings | null;
   
   // Actions
@@ -50,6 +51,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [round, setRound] = useState(1);
   const [isDrawer, setIsDrawer] = useState(false);
   const [isGameStarted, setIsGameStarted] = useState(false);
+  const [isHost, setIsHost] = useState(false);
   const [gameSettings, setGameSettings] = useState<GameSettings | null>(null);
 
   useEffect(() => {
@@ -76,6 +78,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     socket.on('player-left', ({ players: newPlayers }) => {
       setPlayers(newPlayers);
+    });
+
+    socket.on('new-host', ({ hostId }) => {
+      setIsHost(hostId === socket.id);
     });
 
     socket.on('game-started', ({ room: newRoom, drawerId, word, round: r, timeLeft: t }) => {
@@ -175,6 +181,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         setRoom(response.room);
         setCurrentPlayer({ id: response.playerId, name: playerName, score: 0, isReady: true });
         setPlayers(response.room.players);
+        setIsHost(true);
         setGameSettings({
           customWords: settings?.customWords || [],
           rounds: settings?.rounds || 3,
@@ -192,6 +199,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         setRoom(response.room);
         setCurrentPlayer({ id: response.playerId, name: playerName, score: 0, isReady: true });
         setPlayers(response.room.players);
+        setIsHost(response.room.hostId === response.playerId);
         setGameSettings({
           customWords: response.room.customWords || [],
           rounds: response.room.totalRounds || 3,
@@ -213,6 +221,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     setIsGameStarted(false);
     setCurrentWord('');
     setRound(1);
+    setIsHost(false);
   };
 
   const startGame = () => {
@@ -260,6 +269,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       round,
       isDrawer,
       isGameStarted,
+      isHost,
       gameSettings,
       createRoom,
       joinRoom,

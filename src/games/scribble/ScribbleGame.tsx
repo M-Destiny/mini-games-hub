@@ -21,6 +21,7 @@ export default function ScribbleGame() {
     timeLeft, 
     isDrawer,
     isGameStarted,
+    isHost,
     round: currentRound,
     leaveRoom: socketLeaveRoom, 
     startGame,
@@ -370,14 +371,21 @@ export default function ScribbleGame() {
                   <div key={player.id} className="flex items-center gap-2 bg-gray-700/50 px-4 py-2 rounded-lg">
                     <span>{player.name}</span>
                     {player.id === currentPlayer?.id && <span className="text-xs bg-purple-500/30 text-purple-300 px-2 py-0.5 rounded">You</span>}
+                    {player.id === room?.hostId && <span className="text-xs bg-yellow-500/30 text-yellow-300 px-2 py-0.5 rounded">👑 Host</span>}
                   </div>
                 ))}
               </div>
             </div>
 
-            <button onClick={() => startGame()} disabled={players.length < 1} className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg font-bold disabled:opacity-50">
-              Start Game 🚀
-            </button>
+            {isHost ? (
+              <button onClick={() => startGame()} disabled={players.length < 1} className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg font-bold disabled:opacity-50">
+                Start Game 🚀
+              </button>
+            ) : (
+              <div className="w-full py-3 bg-gray-700 rounded-lg font-bold text-center text-gray-400">
+                Waiting for host to start...
+              </div>
+            )}
           </div>
         </div>
       )}

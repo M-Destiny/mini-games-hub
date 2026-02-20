@@ -30,6 +30,7 @@ io.on('connection', (socket) => {
     const room = {
       id: roomId,
       name: roomName,
+      hostId: socket.id,
       players: [{
         id: socket.id,
         name: playerName,
@@ -62,11 +63,14 @@ io.on('connection', (socket) => {
       return;
     }
     
-    if (room.gameStarted) {
-      callback({ success: false, error: 'Game already started' });
+    // Check if player already in room
+    const existingPlayer = room.players.find(p => p.id === socket.id);
+    if (existingPlayer) {
+      callback({ success: true, room, playerId: socket.id });
       return;
     }
     
+    // Add player (can join mid-game)
     room.players.push({
       id: socket.id,
       name: playerName,
@@ -77,6 +81,7 @@ io.on('connection', (socket) => {
     socket.data.roomId = roomId;
     socket.data.playerName = playerName;
     
+    // Notify others
     io.to(roomId).emit('player-joined', { 
       players: room.players,
       playerId: socket.id,
@@ -92,6 +97,12 @@ io.on('connection', (socket) => {
     
     if (!room) {
       callback({ success: false, error: 'Room not found' });
+      return;
+    }
+    
+    // Only host can start
+    if (room.hostId !== socket.id) {
+      callback({ success: false, error: 'Only host can start the game' });
       return;
     }
     
@@ -197,12 +208,20 @@ function handleLeave(socket) {
   const room = rooms.get(roomId);
   if (!room) return;
   
+  const wasHost = room.hostId === socket.id;
   room.players = room.players.filter(p => p.id !== socket.id);
   
   if (room.players.length === 0) {
     rooms.delete(roomId);
     console.log(`Room ${roomId} deleted (empty)`);
   } else {
+    // If host left, assign new host
+    if (wasHost && room.players.length > 0) {
+      room.hostId = room.players[0].id;
+      io.to(roomId).emit('new-host', { hostId: room.hostId });
+    }
+    
+    // If drawer left mid-game, assign new drawer
     if (room.isDrawer === socket.id && room.gameStarted) {
       room.isDrawer = room.players[0].id;
     }

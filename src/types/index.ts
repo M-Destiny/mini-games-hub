@@ -8,9 +8,15 @@ export interface Player {
 export interface Room {
   id: string;
   name: string;
+  hostId: string;
   players: Player[];
   maxPlayers: number;
   gameStarted: boolean;
+  currentWord?: string;
+  round?: number;
+  totalRounds?: number;
+  roundTime?: number;
+  customWords?: string[];
 }
 
 export interface GameState {
