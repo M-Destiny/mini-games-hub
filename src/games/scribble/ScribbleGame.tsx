@@ -1,14 +1,24 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../context/SocketContext';
-import type { DrawingPoint } from '../../types';
 
+// Better color palette
 const COLORS = [
-  '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF',
-  '#FFFF00', '#FF00FF', '#00FFFF', '#FF8800', '#8800FF',
-  '#FF0088', '#00FF88',
+  '#1a1a2e', // Black
+  '#ffffff', // White
+  '#e74c3c', // Red
+  '#2ecc71', // Green
+  '#3498db', // Blue
+  '#f1c40f', // Yellow
+  '#9b59b6', // Purple
+  '#1abc9c', // Teal
+  '#e67e22', // Orange
+  '#e91e63', // Pink
+  '#795548', // Brown
+  '#607d8b', // Gray
 ];
 
-const BRUSH_SIZES = [2, 4, 6, 8, 12];
+const BRUSH_SIZES = [3, 5, 8, 12, 18];
 
 interface Props {
   customWords?: string[];
@@ -17,6 +27,7 @@ interface Props {
 }
 
 export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
+  const navigate = useNavigate();
   const { 
     room, 
     players, 
@@ -27,7 +38,7 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
     isDrawer,
     isGameStarted,
     round: currentRound,
-    leaveRoom, 
+    leaveRoom: socketLeaveRoom, 
     startGame,
     sendDraw,
     sendGuess,
@@ -36,11 +47,12 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [currentColor, setCurrentColor] = useState('#000000');
-  const [brushSize, setBrushSize] = useState(4);
+  const [currentColor, setCurrentColor] = useState('#1a1a2e');
+  const [brushSize, setBrushSize] = useState(8);
   const [guess, setGuess] = useState('');
   const [showWord, setShowWord] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
   // Responsive canvas
   useEffect(() => {
@@ -67,6 +79,8 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
     
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
   }, [canvasSize]);
 
   const getCanvasPoint = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -93,15 +107,25 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
     };
   }, []);
 
-  const drawPoint = useCallback((point: DrawingPoint) => {
+  // Draw a line between two points
+  const drawLine = useCallback((from: { x: number; y: number }, to: { x: number; y: number }, color: string, width: number) => {
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
     
-    ctx.fillStyle = point.color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.arc(point.x, point.y, point.width / 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
   }, []);
+
+  const handleLeave = () => {
+    socketLeaveRoom();
+    navigate('/');
+  };
 
   const startDrawing = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawer) return;
@@ -109,35 +133,35 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
     setIsDrawing(true);
     
     const point = getCanvasPoint(e);
-    const drawPointData: DrawingPoint = {
-      x: point.x,
-      y: point.y,
-      color: currentColor,
-      width: brushSize,
-    };
+    lastPointRef.current = point;
     
-    drawPoint(drawPointData);
-    sendDraw(drawPointData);
-  }, [isDrawer, getCanvasPoint, currentColor, brushSize, drawPoint, sendDraw]);
+    // Draw initial dot
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = currentColor;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }, [isDrawer, getCanvasPoint, currentColor, brushSize]);
 
   const draw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing || !isDrawer) return;
     e.preventDefault();
     
     const point = getCanvasPoint(e);
-    const drawPointData: DrawingPoint = {
-      x: point.x,
-      y: point.y,
-      color: currentColor,
-      width: brushSize,
-    };
     
-    drawPoint(drawPointData);
-    sendDraw(drawPointData);
-  }, [isDrawing, isDrawer, getCanvasPoint, currentColor, brushSize, drawPoint, sendDraw]);
+    if (lastPointRef.current) {
+      drawLine(lastPointRef.current, point, currentColor, brushSize);
+      sendDraw({ x: point.x, y: point.y, color: currentColor, width: brushSize });
+    }
+    
+    lastPointRef.current = point;
+  }, [isDrawing, isDrawer, getCanvasPoint, drawLine, currentColor, brushSize, sendDraw]);
 
   const stopDrawing = useCallback(() => {
     setIsDrawing(false);
+    lastPointRef.current = null;
   }, []);
 
   const clearCanvas = useCallback(() => {
@@ -172,7 +196,7 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col h-screen lg:h-auto">
-      {/* Header - Responsive */}
+      {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700 px-3 py-2 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 lg:gap-4 overflow-hidden">
           <h1 className="text-lg lg:text-xl font-bold whitespace-nowrap">🎨 Scribble</h1>
@@ -194,15 +218,15 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
             </div>
           )}
           <button
-            onClick={leaveRoom}
+            onClick={handleLeave}
             className="px-3 lg:px-4 py-1.5 lg:py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 text-sm lg:text-base"
           >
-            Leave
+            ✕ Exit
           </button>
         </div>
       </header>
 
-      {/* Main Game Area - Responsive flex */}
+      {/* Main Game Area */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Canvas Area */}
         <div className="flex-1 p-2 lg:p-4 flex flex-col min-h-0">
@@ -250,17 +274,17 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
             />
           </div>
 
-          {/* Drawing Tools - Responsive */}
+          {/* Drawing Tools */}
           {isDrawer && isGameStarted && (
             <div className="mt-2 lg:mt-4 flex items-center gap-2 lg:gap-4 bg-gray-800 p-2 lg:p-4 rounded-xl overflow-x-auto">
-              {/* Colors - Scrollable on mobile */}
+              {/* Colors */}
               <div className="flex gap-1 lg:gap-2 flex-shrink-0">
                 {COLORS.map((color) => (
                   <button
                     key={color}
                     onClick={() => setCurrentColor(color)}
-                    className={`w-6 h-6 lg:w-8 lg:h-8 rounded-full border-2 flex-shrink-0 ${
-                      currentColor === color ? 'border-white' : 'border-transparent'
+                    className={`w-7 h-7 lg:w-8 lg:h-8 rounded-full border-2 flex-shrink-0 transition-transform hover:scale-110 ${
+                      currentColor === color ? 'border-white scale-110' : 'border-transparent'
                     }`}
                     style={{ backgroundColor: color }}
                     aria-label={`Color ${color}`}
@@ -276,14 +300,14 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
                   <button
                     key={size}
                     onClick={() => setBrushSize(size)}
-                    className={`w-8 h-8 lg:w-10 lg:h-10 rounded-lg flex items-center justify-center ${
-                      brushSize === size ? 'bg-purple-500' : 'bg-gray-700'
+                    className={`w-8 h-8 lg:w-10 lg:h-10 rounded-lg flex items-center justify-center transition-all ${
+                      brushSize === size ? 'bg-purple-500 scale-110' : 'bg-gray-700 hover:bg-gray-600'
                     }`}
                     aria-label={`Brush size ${size}`}
                   >
                     <div
                       className="rounded-full bg-white"
-                      style={{ width: Math.min(size * 2, 16), height: Math.min(size * 2, 16) }}
+                      style={{ width: Math.min(size * 1.5, 18), height: Math.min(size * 1.5, 18) }}
                     />
                   </button>
                 ))}
@@ -301,7 +325,7 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
           )}
         </div>
 
-        {/* Sidebar - Responsive: bottom sheet on mobile, side on desktop */}
+        {/* Sidebar */}
         <div className="w-full lg:w-80 bg-gray-800 border-t lg:border-t-0 lg:border-l border-gray-700 flex flex-col max-h-[40vh] lg:max-h-none">
           {/* Players */}
           <div className="p-2 lg:p-4 border-b border-gray-700 flex-shrink-0">
@@ -326,7 +350,7 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
             </div>
           </div>
 
-          {/* Chat / Guessing */}
+          {/* Chat */}
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
             <div className="p-2 lg:p-4 border-b border-gray-700 flex-shrink-0">
               <h3 className="font-bold text-sm lg:text-base">
