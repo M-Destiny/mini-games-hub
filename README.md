@@ -10,6 +10,8 @@ A multiplayer mini-games platform with shareable room links. Play with friends i
 - **Shareable Room Links** - Just share the link and friends can join
 - **No Player Limits** - Invite as many friends as you want
 - **No Downloads** - Runs entirely in the browser
+- **Auto-reconnect** - Reload page and stay in room
+- **Host Controls** - Only host can start game
 
 ## 🎯 Available Games
 
@@ -17,16 +19,19 @@ A multiplayer mini-games platform with shareable room links. Play with friends i
 Draw and guess words with your friends!
 - Custom word lists
 - Configurable rounds (1-6)
-- Configurable time per round
-- Drawing tools: colors & brush sizes
-- Responsive design
+- Configurable time per round (30-120s)
+- 12 colors & 5 brush sizes
+- Smooth drawing for all players
+- Time-based hints
+- Points = time remaining × 10
 
 ### ✅ Hangman (Ready!)
 Classic word guessing game!
 - 5 categories: Animals, Fruits, Countries, Movies, Sports
-- Configurable rounds
+- Configurable rounds (1-6)
+- 100 points per correct guess
 - Multiplayer support
-- Host can start game
+- Round tracking
 
 ### 🚧 Coming Soon
 - Word Chain
@@ -66,11 +71,15 @@ Classic word guessing game!
 ```
 mini-games-hub/
 ├── src/
-│   ├── context/SocketContext.tsx   # Socket.io state
+│   ├── context/SocketContext.tsx   # Socket.io state + reconnection
 │   ├── games/
 │   │   ├── scribble/              # Scribble game
 │   │   └── hangman/              # Hangman game
 │   ├── pages/                    # Create/Join pages
+│   │   ├── CreateRoom.tsx         # Scribble room
+│   │   ├── JoinRoom.tsx          # Scribble join
+│   │   ├── CreateHangmanRoom.tsx # Hangman room
+│   │   └── JoinHangmanRoom.tsx   # Hangman join
 │   └── App.tsx                   # Routing
 ├── server/
 │   └── index.js                  # Socket.io server
@@ -79,12 +88,12 @@ mini-games-hub/
 
 ## 🤝 Contributing
 
-1. Fork the repo
+1. Fork the repo: https://github.com/M-Destiny/mini-games-hub
 2. Create feature branch
 3. Commit and push
 4. Open a PR
 
 ---
 
-**Created by Destiny and Clawe** 🐾  
+**Created by [Destiny](https://github.com/M-Destiny) and [Clawe](https://github.com/openclaw)** 🐾  
 *The best assistant in the world*
