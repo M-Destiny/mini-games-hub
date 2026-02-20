@@ -24,6 +24,23 @@ const rooms = new Map();
 const WORD_LISTS = {
   scribble: ['apple', 'banana', 'car', 'dog', 'elephant', 'flower', 'guitar', 'house', 'island', 'jungle', 'kite', 'lamp', 'mountain', 'notebook', 'ocean', 'pizza', 'queen', 'rainbow', 'sunflower', 'tree', 'umbrella', 'volcano', 'waterfall', 'xylophone'],
   wordchain: ['APPLE', 'BANANA', 'CAT', 'DOG', 'ELEPHANT', 'FISH', 'GRAPE', 'HOUSE', 'ICE', 'JUMP', 'KITE', 'LION', 'MOON', 'NEST', 'OCEAN', 'PIZZA', 'QUEEN', 'RAIN', 'STAR', 'TREE', 'UMBRELLA', 'VIOLIN', 'WATER', 'YELLOW', 'ZEBRA'],
+  trivia: [
+    { q: "What is the capital of France?", options: ["A) London", "B) Paris", "C) Berlin", "D) Madrid"], answer: "B" },
+    { q: "Which planet is known as Red Planet?", options: ["A) Venus", "B) Mars", "C) Jupiter", "D) Saturn"], answer: "B" },
+    { q: "What is 5 + 7?", options: ["A) 10", "B) 11", "C) 12", "D) 13"], answer: "C" },
+    { q: "Which animal is King of Jungle?", options: ["A) Tiger", "B) Lion", "C) Elephant", "D) Bear"], answer: "B" },
+    { q: "What color do you get mixing Red + Blue?", options: ["A) Green", "B) Orange", "C) Purple", "D) Yellow"], answer: "C" },
+    { q: "How many days in a week?", options: ["A) 5", "B) 6", "C) 7", "D) 8"], answer: "C" },
+    { q: "Which is the largest ocean?", options: ["A) Atlantic", "B) Indian", "C) Arctic", "D) Pacific"], answer: "D" },
+    { q: "What is H2O?", options: ["A) Salt", "B) Sugar", "C) Water", "D) Oxygen"], answer: "C" },
+    { q: "Which country has the most people?", options: ["A) USA", "B) India", "C) China", "D) Russia"], answer: "B" },
+    { q: "What is the square of 4?", options: ["A) 8", "B) 12", "C) 16", "D) 20"], answer: "C" },
+    { q: "Which fruit is yellow?", options: ["A) Apple", "B) Banana", "C) Grape", "D) Orange"], answer: "B" },
+    { q: "How many legs does a spider have?", options: ["A) 6", "B) 8", "C) 10", "D) 12"], answer: "B" },
+    { q: "What is the fastest land animal?", options: ["A) Lion", "B) Cheetah", "C) Tiger", "D) Horse"], answer: "B" },
+    { q: "Which element has symbol 'O'?", options: ["A) Gold", "B) Oxygen", "C) Osmium", "D) Iron"], answer: "B" },
+    { q: "What is 10 × 5?", options: ["A) 40", "B) 45", "C) 50", "D) 55"], answer: "C" },
+  ],
   hangman: {
     animals: ['ELEPHANT', 'GIRAFFE', 'DOLPHIN', 'PENGUIN', 'KANGAROO', 'BUTTERFLY', 'RHINOCEROS', 'CROCODILE', 'HIPPOPOTAMUS', 'OCTOPUS'],
     fruits: ['APPLE', 'BANANA', 'ORANGE', 'WATERMELON', 'STRAWBERRY', 'PINEAPPLE', 'BLUEBERRY', 'RASPBERRY', 'CHERRY', 'MANGO'],
@@ -42,10 +59,17 @@ function getRandomWord(gameType, category = null) {
       const categories = Object.values(WORD_LISTS.hangman);
       words = categories[Math.floor(Math.random() * categories.length)];
     }
+  } else if (gameType === 'wordchain') {
+    words = WORD_LISTS.wordchain;
   } else {
     words = WORD_LISTS.scribble || [];
   }
   return words[Math.floor(Math.random() * words.length)].toUpperCase();
+}
+
+function getRandomTriviaQuestion() {
+  const questions = WORD_LISTS.trivia;
+  return questions[Math.floor(Math.random() * questions.length)];
 }
 
 io.on('connection', (socket) => {
@@ -148,7 +172,14 @@ io.on('connection', (socket) => {
       room.chainWords = [room.currentWord];
       room.lastLetter = room.currentWord.slice(-1);
       room.currentPlayerIndex = 0;
-      room.wordChainTime = 20; // 20 seconds per turn
+      room.wordChainTime = 20;
+    } else if (room.gameType === 'trivia') {
+      room.isDrawer = null;
+      room.triviaQuestionIndex = 0;
+      room.currentWord = ''; // Not used for trivia
+      room.currentQuestion = getRandomTriviaQuestion();
+      room.triviaAnswers = {};
+      room.triviaRevealed = false;
     }
     room.timeLeft = room.roundTime;
     
@@ -164,6 +195,13 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('wordchain-start', {
         word: room.currentWord,
         startedBy: socket.id,
+      });
+    }
+    
+    // Emit Trivia specific event
+    if (room.gameType === 'trivia') {
+      io.to(roomId).emit('trivia-start', {
+        question: room.currentQuestion,
       });
     }
     
@@ -314,6 +352,73 @@ io.on('connection', (socket) => {
     if (callback) callback({ success: true });
   });
 
+  // Trivia events
+  socket.on('trivia-submit', ({ roomId, answer }, callback) => {
+    const room = rooms.get(roomId);
+    if (!room || room.gameType !== 'trivia') return;
+    
+    const answerUpper = answer.toUpperCase().trim();
+    
+    // Already answered this round
+    if (room.triviaAnswers && room.triviaAnswers[socket.id]) {
+      if (callback) callback({ success: false, error: 'Already answered' });
+      return;
+    }
+    
+    if (!room.triviaAnswers) room.triviaAnswers = {};
+    const isCorrect = answerUpper === room.currentQuestion.answer;
+    room.triviaAnswers[socket.id] = { answer: answerUpper, isCorrect };
+    
+    // Award points if correct
+    if (isCorrect) {
+      const player = room.players.find(p => p.id === socket.id);
+      if (player) player.score += 100;
+    }
+    
+    io.to(roomId).emit('trivia-answer', {
+      playerId: socket.id,
+      playerName: socket.data.playerName,
+      answer: answerUpper,
+      isCorrect,
+    });
+    
+    // Check if all players answered or enough time passed
+    const totalPlayers = room.players.length;
+    const answeredCount = Object.keys(room.triviaAnswers).length;
+    
+    if (answeredCount >= totalPlayers || (isCorrect && answeredCount >= Math.ceil(totalPlayers / 2))) {
+      // Reveal answer and move to next round
+      room.triviaRevealed = true;
+      io.to(roomId).emit('trivia-reveal', { answer: room.currentQuestion.answer });
+      
+      // Find winner for this round
+      let roundWinner = null;
+      for (const [playerId, data] of Object.entries(room.triviaAnswers)) {
+        if (data.isCorrect) {
+          const player = room.players.find(p => p.id === playerId);
+          if (player) {
+            roundWinner = { id: playerId, name: player.name, score: player.score };
+            break;
+          }
+        }
+      }
+      
+      // Emit round over
+      setTimeout(() => {
+        io.to(roomId).emit('trivia-round-over', {
+          winner: roundWinner,
+          round: room.round,
+          totalRounds: room.totalRounds,
+        });
+        
+        // Move to next round
+        nextTriviaRound(roomId, room);
+      }, 2000);
+    }
+    
+    if (callback) callback({ success: true });
+  });
+
   socket.on('leave-room', () => handleLeave(socket));
   socket.on('disconnect', () => handleLeave(socket));
 });
@@ -372,6 +477,30 @@ function nextHangmanRound(roomId, room) {
   io.to(roomId).emit('next-round', {
     round: room.round,
     word: room.currentWord,
+  });
+}
+
+function nextTriviaRound(roomId, room) {
+  if (room.round >= room.totalRounds) {
+    // Game over - show final standings
+    room.gameStarted = false;
+    const winner = [...room.players].sort((a, b) => b.score - a.score)[0];
+    io.to(roomId).emit('trivia-game-over', {
+      winner,
+      scores: room.players,
+    });
+    return;
+  }
+  
+  // Next round
+  room.round++;
+  room.triviaAnswers = {};
+  room.triviaRevealed = false;
+  room.currentQuestion = getRandomTriviaQuestion();
+  
+  io.to(roomId).emit('next-round', {
+    round: room.round,
+    question: room.currentQuestion,
   });
 }
 
