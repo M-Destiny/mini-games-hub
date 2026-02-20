@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from 'react';
+import { io, type Socket } from 'socket.io-client';
 import type { Player, Room, DrawingPoint, ChatMessage } from '../types';
 
 interface GameSettings {
@@ -8,7 +9,7 @@ interface GameSettings {
 }
 
 interface SocketContextType {
-  socket: unknown;
+  socket: Socket | null;
   isConnected: boolean;
   room: Room | null;
   currentPlayer: Player | null;
@@ -31,16 +32,13 @@ interface SocketContextType {
   sendMessage: (message: string) => void;
 }
 
-const DEFAULT_WORDS = [
-  'apple', 'banana', 'car', 'dog', 'elephant', 'flower', 'guitar', 'house',
-  'island', 'jungle', 'kite', 'lamp', 'mountain', 'notebook', 'ocean', 'pizza',
-  'queen', 'rainbow', 'sunflower', 'tree', 'umbrella', 'volcano', 'waterfall', 'xylophone',
-  'yacht', 'zebra', 'airplane', 'butterfly', 'castle', 'dragon', 'fireworks', 'galaxy',
-];
-
 const SocketContext = createContext<SocketContextType | null>(null);
 
+// Use environment variable or default to localhost for development
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+
 export function SocketProvider({ children }: { children: ReactNode }) {
+  const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
@@ -54,139 +52,78 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [gameSettings, setGameSettings] = useState<GameSettings | null>(null);
 
   useEffect(() => {
-    setIsConnected(true);
-  }, []);
+    // Connect to socket server
+    const socket = io(SOCKET_URL, {
+      autoConnect: true,
+      reconnection: true,
+    });
 
-  const getRandomWord = () => {
-    const words = gameSettings?.customWords || DEFAULT_WORDS;
-    return words[Math.floor(Math.random() * words.length)].toUpperCase();
-  };
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      setIsConnected(true);
+    });
 
-  const createRoom = (playerName: string, roomName: string, settings?: Partial<GameSettings>) => {
-    const newPlayer: Player = {
-      id: 'player-' + Math.random().toString(36).substr(2, 9),
-      name: playerName,
-      score: 0,
-      isReady: true,
-    };
-    
-    const newRoom: Room = {
-      id: Math.random().toString(36).substr(2, 6).toUpperCase(),
-      name: roomName,
-      players: [newPlayer],
-      maxPlayers: 8,
-      gameStarted: false,
-    };
-    
-    const finalSettings: GameSettings = {
-      customWords: settings?.customWords || DEFAULT_WORDS,
-      rounds: settings?.rounds || 3,
-      roundTime: settings?.roundTime || 80,
-    };
-    
-    setRoom(newRoom);
-    setCurrentPlayer(newPlayer);
-    setPlayers([newPlayer]);
-    setGameSettings(finalSettings);
-  };
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+      setIsConnected(false);
+    });
 
-  const joinRoom = (roomId: string, playerName: string) => {
-    const newPlayer: Player = {
-      id: 'player-' + Math.random().toString(36).substr(2, 9),
-      name: playerName,
-      score: 0,
-      isReady: true,
-    };
-    
-    const existingRoom: Room = {
-      id: roomId,
-      name: 'Room ' + roomId,
-      players: [newPlayer],
-      maxPlayers: 8,
-      gameStarted: false,
-    };
-    
-    setRoom(existingRoom);
-    setCurrentPlayer(newPlayer);
-    setPlayers([newPlayer]);
-    
-    // Try to load settings from session
-    const stored = sessionStorage.getItem('gameSettings');
-    if (stored) {
-      try {
-        setGameSettings(JSON.parse(stored));
-      } catch {
-        // Ignore
-      }
-    }
-  };
+    // Room events
+    socket.on('player-joined', ({ players: newPlayers }) => {
+      setPlayers(newPlayers);
+    });
 
-  const leaveRoom = () => {
-    setRoom(null);
-    setCurrentPlayer(null);
-    setPlayers([]);
-    setMessages([]);
-    setIsGameStarted(false);
-    setCurrentWord('');
-    setRound(1);
-    sessionStorage.removeItem('gameSettings');
-  };
+    socket.on('player-left', ({ players: newPlayers }) => {
+      setPlayers(newPlayers);
+    });
 
-  const startGame = () => {
-    setIsGameStarted(true);
-    setIsDrawer(true);
-    setCurrentWord(getRandomWord());
-    setTimeLeft(gameSettings?.roundTime || 80);
-    setRound(1);
-  };
+    socket.on('game-started', ({ room: newRoom, drawerId, word, round: r, timeLeft: t }) => {
+      setRoom(newRoom);
+      setIsGameStarted(true);
+      setRound(r);
+      setCurrentWord(word);
+      setTimeLeft(t);
+      setIsDrawer(drawerId === socket.id);
+      setMessages([]);
+    });
 
-  const sendDraw = (point: DrawingPoint) => {
-    console.log('Drawing:', point);
-  };
+    socket.on('next-round', ({ round: r, drawerId, word, timeLeft: t }) => {
+      setRound(r);
+      setCurrentWord(word);
+      setTimeLeft(t);
+      setIsDrawer(drawerId === socket.id);
+    });
 
-  const sendGuess = (guess: string) => {
-    if (guess.toUpperCase() === currentWord.toUpperCase()) {
-      const msg: ChatMessage = {
-        id: Date.now().toString(),
-        playerId: currentPlayer?.id || '',
-        playerName: currentPlayer?.name || '',
-        message: guess,
-        isCorrect: true,
-        timestamp: Date.now(),
-      };
+    socket.on('timer-update', ({ timeLeft: t }) => {
+      setTimeLeft(t);
+    });
+
+    socket.on('new-message', (msg: ChatMessage) => {
       setMessages(prev => [...prev, msg]);
-      
-      // Update score
+    });
+
+    socket.on('correct-guess', ({ playerId, score }) => {
       setPlayers(prev => prev.map(p => 
-        p.id === currentPlayer?.id 
-          ? { ...p, score: p.score + (gameSettings?.roundTime || 80) * 10 }
-          : p
+        p.id === playerId ? { ...p, score: p.score + score } : p
       ));
-      
-      // Next round after delay
-      setTimeout(() => {
-        nextRound();
-      }, 2000);
-    } else {
-      const msg: ChatMessage = {
-        id: Date.now().toString(),
-        playerId: currentPlayer?.id || '',
-        playerName: currentPlayer?.name || '',
-        message: guess,
-        isCorrect: false,
-        timestamp: Date.now(),
-      };
-      setMessages(prev => [...prev, msg]);
-    }
-  };
+    });
 
-  const nextRound = () => {
-    const currentRoundNum = round;
-    const totalRounds = gameSettings?.rounds || 3;
-    
-    if (currentRoundNum >= totalRounds) {
-      // Game over - find winner
-      const winner = [...players].sort((a, b) => b.score - a.score)[0];
+    socket.on('draw', (point: DrawingPoint) => {
+      // Handle incoming drawing from other players
+      const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      ctx.fillStyle = point.color;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, point.width / 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    socket.on('game-over', ({ winner, scores }) => {
+      setIsGameStarted(false);
+      setPlayers(scores);
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         playerId: 'system',
@@ -195,34 +132,92 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         isCorrect: false,
         timestamp: Date.now(),
       }]);
-      setIsGameStarted(false);
-      return;
-    }
+    });
+
+    socketRef.current = socket;
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+  const createRoom = (playerName: string, roomName: string, settings?: Partial<GameSettings>) => {
+    if (!socketRef.current) return;
     
-    setRound(currentRoundNum + 1);
-    setIsDrawer(!isDrawer);
-    setCurrentWord(getRandomWord());
-    setTimeLeft(gameSettings?.roundTime || 80);
+    socketRef.current.emit('create-room', { 
+      playerName, 
+      roomName, 
+      settings: {
+        customWords: settings?.customWords || [],
+        rounds: settings?.rounds || 3,
+        roundTime: settings?.roundTime || 80,
+      }
+    }, (response: any) => {
+      if (response.success) {
+        setRoom(response.room);
+        setCurrentPlayer({ id: response.playerId, name: playerName, score: 0, isReady: true });
+        setPlayers(response.room.players);
+        setGameSettings({
+          customWords: settings?.customWords || [],
+          rounds: settings?.rounds || 3,
+          roundTime: settings?.roundTime || 80,
+        });
+      }
+    });
   };
 
-  // Timer countdown
-  useEffect(() => {
-    if (!isGameStarted || timeLeft <= 0) return;
+  const joinRoom = (roomId: string, playerName: string) => {
+    if (!socketRef.current) return;
     
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          nextRound();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [isGameStarted, timeLeft, round, isDrawer]);
+    socketRef.current.emit('join-room', { roomId, playerName }, (response: any) => {
+      if (response.success) {
+        setRoom(response.room);
+        setCurrentPlayer({ id: response.playerId, name: playerName, score: 0, isReady: true });
+        setPlayers(response.room.players);
+        setGameSettings({
+          customWords: response.room.customWords || [],
+          rounds: response.room.totalRounds || 3,
+          roundTime: response.room.roundTime || 80,
+        });
+      } else {
+        alert(response.error || 'Failed to join room');
+      }
+    });
+  };
+
+  const leaveRoom = () => {
+    if (!socketRef.current) return;
+    socketRef.current.emit('leave-room');
+    setRoom(null);
+    setCurrentPlayer(null);
+    setPlayers([]);
+    setMessages([]);
+    setIsGameStarted(false);
+    setCurrentWord('');
+    setRound(1);
+  };
+
+  const startGame = () => {
+    if (!socketRef.current || !room) return;
+    socketRef.current.emit('start-game', { roomId: room.id }, (response: any) => {
+      if (!response.success) {
+        alert(response.error || 'Failed to start game');
+      }
+    });
+  };
+
+  const sendDraw = (point: DrawingPoint) => {
+    if (!socketRef.current || !room) return;
+    socketRef.current.emit('draw', { roomId: room.id, point });
+  };
+
+  const sendGuess = (guess: string) => {
+    if (!socketRef.current || !room) return;
+    socketRef.current.emit('guess', { roomId: room.id, guess });
+  };
 
   const sendMessage = (message: string) => {
+    // For chat messages (not guesses)
     const msg: ChatMessage = {
       id: Date.now().toString(),
       playerId: currentPlayer?.id || '',
@@ -236,7 +231,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   return (
     <SocketContext.Provider value={{
-      socket: null,
+      socket: socketRef.current,
       isConnected,
       room,
       currentPlayer,

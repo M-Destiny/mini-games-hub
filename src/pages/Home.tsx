@@ -8,6 +8,16 @@ const games = [
     icon: '🎨',
     color: 'from-pink-500 to-rose-500',
     status: 'Ready',
+    link: '/scribble',
+  },
+  {
+    id: 'hangman',
+    name: 'Hangman',
+    description: 'Classic word guessing game',
+    icon: '🏴',
+    color: 'from-emerald-500 to-teal-500',
+    status: 'Ready',
+    link: '/hangman',
   },
   {
     id: 'wordchain',
@@ -16,6 +26,7 @@ const games = [
     icon: '🔤',
     color: 'from-purple-500 to-indigo-500',
     status: 'Coming Soon',
+    link: '#',
   },
   {
     id: 'trivia',
@@ -24,14 +35,7 @@ const games = [
     icon: '❓',
     color: 'from-amber-500 to-orange-500',
     status: 'Coming Soon',
-  },
-  {
-    id: 'hangman',
-    name: 'Hangman',
-    description: 'Classic word guessing game',
-    icon: '⭐',
-    color: 'from-emerald-500 to-teal-500',
-    status: 'Coming Soon',
+    link: '#',
   },
 ];
 
@@ -69,9 +73,9 @@ export default function Home() {
           {games.map((game) => (
             <Link
               key={game.id}
-              to={game.status === 'Ready' ? `/scribble` : '#'}
+              to={game.link}
               className={`group relative overflow-hidden rounded-2xl bg-gray-800 border border-gray-700 hover:border-gray-600 transition-all hover:scale-[1.02] hover:shadow-2xl ${
-                game.status !== 'Ready' ? 'opacity-60 pointer-events-none' : ''
+                game.status !== 'Ready' ? 'opacity-60' : ''
               }`}
             >
               {/* Gradient overlay */}

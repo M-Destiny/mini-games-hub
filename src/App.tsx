@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import CreateRoom from './pages/CreateRoom';
 import JoinRoom from './pages/JoinRoom';
 import ScribbleGame from './games/scribble/ScribbleGame';
+import HangmanGame from './games/hangman/HangmanGame';
 
 function App() {
   return (
@@ -15,6 +16,8 @@ function App() {
           <Route path="/scribble/create" element={<CreateRoom />} />
           <Route path="/scribble/join" element={<JoinRoom />} />
           <Route path="/scribble/room" element={<ScribbleGame />} />
+          <Route path="/hangman" element={<Navigate to="/hangman/play" />} />
+          <Route path="/hangman/play" element={<HangmanGame />} />
         </Routes>
       </BrowserRouter>
     </SocketProvider>

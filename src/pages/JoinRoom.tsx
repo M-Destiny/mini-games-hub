@@ -1,12 +1,21 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSocket } from '../context/SocketContext';
 
 export default function JoinRoom() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { joinRoom } = useSocket();
   const [playerName, setPlayerName] = useState('');
   const [roomCode, setRoomCode] = useState('');
+
+  // Read room ID from URL params
+  useEffect(() => {
+    const roomId = searchParams.get('room');
+    if (roomId) {
+      setRoomCode(roomId.toUpperCase());
+    }
+  }, [searchParams]);
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();

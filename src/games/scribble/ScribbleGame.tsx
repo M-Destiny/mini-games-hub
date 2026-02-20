@@ -260,6 +260,7 @@ export default function ScribbleGame({ rounds = 3, roundTime = 80 }: Props) {
             className="flex-1 bg-white rounded-xl overflow-hidden min-h-[200px] lg:min-h-0"
           >
             <canvas
+              id="game-canvas"
               ref={canvasRef}
               width={canvasSize.width}
               height={canvasSize.height}
