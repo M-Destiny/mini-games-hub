@@ -12,15 +12,12 @@ const HANGMAN_PARTS = [
 ];
 
 const HOW_TO_PLAY = {
-  title: "How to Play Hangman",
   steps: [
     "One person thinks of a word.",
-    "The word is shown as blank lines (one for each letter).",
-    "Everyone else takes turns guessing letters.",
-    "If you guess a wrong letter, the hangman starts to appear.",
-    "You only get 6 wrong guesses!",
-    "If you guess the word before 6 wrong guesses, you win!",
-    "The person who guesses correctly gets 100 points!"
+    "The word is shown as blank lines.",
+    "Everyone guesses letters.",
+    "6 wrong guesses = game over!",
+    "Correct guess = 100 points!"
   ]
 };
 
@@ -29,19 +26,13 @@ export default function HangmanGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showHelp, setShowHelp] = useState(false);
   const { 
-    room, players, currentPlayer, messages, currentWord,
+    room, players, currentPlayer, messages, currentWord, timeLeft,
     isGameStarted, isHost, guessedLetters, wrongGuesses,
     leaveRoom: socketLeaveRoom, startGame, sendHangmanGuess,
   } = useSocket();
 
   const [isGameOver, setIsGameOver] = useState(false);
   const [winner, setWinner] = useState<{name: string, score: number} | null>(null);
-  
-  const keyboardLayout = [
-    'QWERTYUIOP',
-    'ASDFGHJKL',
-    'ZXCVBNM',
-  ];
 
   // Draw hangman
   useEffect(() => {
@@ -58,13 +49,11 @@ export default function HangmanGame() {
     ctx.strokeStyle = '#e74c3c';
     ctx.lineCap = 'round';
 
-    // Base
     ctx.beginPath();
     ctx.moveTo(20, h - 10);
     ctx.lineTo(180, h - 10);
     ctx.stroke();
 
-    // Pole
     ctx.beginPath();
     ctx.moveTo(40, h - 10);
     ctx.lineTo(40, 30);
@@ -72,13 +61,11 @@ export default function HangmanGame() {
     ctx.lineTo(100, 50);
     ctx.stroke();
 
-    // Rope
     ctx.beginPath();
     ctx.moveTo(100, 50);
     ctx.lineTo(100, 70);
     ctx.stroke();
 
-    // Draw wrong parts
     for (let i = 0; i < wrongGuesses && i < HANGMAN_PARTS.length; i++) {
       HANGMAN_PARTS[i](ctx, 100, 90);
     }
@@ -105,19 +92,6 @@ export default function HangmanGame() {
     startGame();
   };
 
-  // Get round info from messages
-  const getRoundInfo = () => {
-    const msg = messages.find(m => m.message?.includes('Round'));
-    if (msg) {
-      const match = msg.message.match(/Round (\d+)\/(\d+)/);
-      if (match) return { current: parseInt(match[1]), total: parseInt(match[2]) };
-    }
-    return null;
-  };
-
-  const roundInfo = getRoundInfo();
-
-  // Check for game over from messages
   useEffect(() => {
     const lastMsg = messages[messages.length - 1];
     if (lastMsg?.message?.includes('wins') || lastMsg?.message?.includes('Game Over')) {
@@ -130,118 +104,70 @@ export default function HangmanGame() {
   }, [messages]);
 
   if (!room) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <p className="text-white">Loading...</p>
-      </div>
-    );
+    return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">Loading...</div>;
   }
 
   return (
-    <div className="h-screen bg-gray-900 text-white flex flex-col overflow-hidden">
+    <div className="h-screen bg-gray-900 text-white flex flex-col">
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <header className="bg-gray-800 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
           <h1 className="text-lg font-bold">🏴 Hangman</h1>
-          <span className="font-mono text-sm">{room.name}</span>
-          <span className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full text-xs">{room.id}</span>
-          {roundInfo && (
-            <span className="bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full text-xs">
-              R{roundInfo.current}/{roundInfo.total}
-            </span>
-          )}
+          <span className="text-gray-400 text-sm">{room.name}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowHelp(true)} className="px-3 py-1.5 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 text-sm">
-            ❓ How to Play
-          </button>
-          <button onClick={handleLeave} className="px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 text-sm">
-            ✕ Exit
-          </button>
+        <div className="flex items-center gap-3">
+          {isGameStarted && <span className="text-red-400 font-bold">{timeLeft}s</span>}
+          <button onClick={() => setShowHelp(true)} className="text-gray-400 hover:text-white">❓</button>
+          <button onClick={handleLeave} className="text-gray-400 hover:text-red-400">✕</button>
         </div>
       </header>
 
       {/* Main */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Game Area */}
-        <div className="flex-1 p-4 flex flex-col items-center">
-          {/* Word */}
-          <div className="mb-4 text-center">
-            <p className="text-gray-400 text-sm">Guess the word:</p>
-            <p className="text-3xl font-bold tracking-widest mt-1">{getDisplayWord()}</p>
-            <p className="text-red-400 text-sm mt-1">Wrong guesses: {wrongGuesses}/6</p>
-            {roundInfo && (
-              <p className="text-yellow-400 text-sm mt-1">Round {roundInfo.current} of {roundInfo.total}</p>
-            )}
+      <div className="flex-1 flex">
+        <div className="flex-1 p-6 flex flex-col items-center justify-center">
+          <p className="text-gray-400 text-sm mb-2">Guess: {getDisplayWord()}</p>
+          <p className="text-red-400 text-sm mb-4">Wrong: {wrongGuesses}/6</p>
+          
+          <canvas ref={canvasRef} width={350} height={300} className="bg-white rounded-xl mb-6" />
+
+          <div className="flex flex-wrap justify-center gap-1 max-w-md">
+            {'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => {
+              const isGuessed = guessedLetters.includes(letter);
+              const isWrong = !currentWord.includes(letter) && isGuessed;
+              return (
+                <button key={letter} onClick={() => handleGuess(letter)} disabled={isGuessed || isGameOver}
+                  className={`w-10 h-10 rounded font-bold text-sm ${isGuessed ? (isWrong ? 'bg-red-600' : 'bg-green-600') : 'bg-gray-700 hover:bg-gray-600'}`}>
+                  {letter}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Canvas - Bigger size */}
-          <canvas ref={canvasRef} width={350} height={300} className="bg-white rounded-xl mb-4 w-full max-w-[350px]" />
-
-          {/* Game Over */}
           {isGameOver && (
-            <div className={`p-4 rounded-xl text-center mb-4 ${winner ? 'bg-green-500/20 border border-green-500/30' : 'bg-red-500/20 border border-red-500/30'}`}>
-              <p className="text-xl font-bold">{winner ? `🎉 ${winner.name} wins!` : 'Game Over!'}</p>
-              <p className="text-gray-300 mt-1">Word: {currentWord}</p>
-              {roundInfo && roundInfo.current < roundInfo.total ? (
-                <p className="text-yellow-400 mt-2">Next round coming...</p>
-              ) : (
-                <button onClick={handleStart} className="mt-3 px-6 py-2 bg-emerald-500 hover:bg-emerald-400 rounded-lg font-bold">
-                  Play Again
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Keyboard */}
-          {!isGameOver && (
-            <div className="space-y-2">
-              {keyboardLayout.map((row, i) => (
-                <div key={i} className="flex justify-center gap-1">
-                  {row.split('').map(letter => {
-                    const isGuessed = guessedLetters.includes(letter);
-                    return (
-                      <button
-                        key={letter}
-                        onClick={() => handleGuess(letter)}
-                        disabled={isGuessed || isGameOver}
-                        className={`w-10 h-12 rounded font-bold ${
-                          isGuessed 
-                            ? (currentWord?.includes(letter) ? 'bg-green-500/50' : 'bg-red-500/50')
-                            : 'bg-gray-700 hover:bg-gray-600'
-                        }`}
-                      >
-                        {letter}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
+            <div className="mt-6 text-center">
+              <p className="text-2xl font-bold">{winner ? `${winner.name} wins!` : 'Game Over!'}</p>
+              <p className="text-gray-400 mt-2">Word: {currentWord}</p>
+              <button onClick={handleStart} className="mt-4 px-6 py-2 bg-emerald-500 rounded-lg font-bold">Play Again</button>
             </div>
           )}
         </div>
 
         {/* Sidebar */}
-        <div className="w-72 bg-gray-800 border-l border-gray-700 flex flex-col">
-          <div className="p-3 border-b border-gray-700">
-            <h3 className="font-bold">Players ({players.length})</h3>
-            <div className="space-y-1 mt-2 max-h-32 overflow-y-auto">
-              {players.map((p) => (
-                <div key={p.id} className="flex items-center justify-between bg-gray-700/50 px-3 py-2 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <span>{p.name}</span>
-                    {p.id === currentPlayer?.id && <span className="text-xs bg-purple-500/30 px-1.5 py-0.5 rounded">You</span>}
-                    {p.id === room.hostId && <span className="text-xs bg-yellow-500/30 text-yellow-300 px-1.5 py-0.5 rounded">👑</span>}
-                  </div>
-                  <span className="font-bold text-emerald-400">{p.score}</span>
-                </div>
-              ))}
-            </div>
+        <div className="w-64 bg-gray-800 p-4 flex flex-col">
+          <h3 className="font-bold mb-3">Players</h3>
+          <div className="space-y-2 mb-4">
+            {players.map((p) => (
+              <div key={p.id} className="flex justify-between bg-gray-700/50 px-3 py-2 rounded">
+                <span>{p.name}</span>
+                <span className="text-purple-400">{p.score}</span>
+              </div>
+            ))}
           </div>
-
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          
+          <h3 className="font-bold mb-3">Chat</h3>
+          <div className="flex-1 overflow-y-auto space-y-2">
             {messages.map((msg) => (
-              <div key={msg.id} className={`px-3 py-2 rounded-lg text-sm ${msg.playerId === 'system' ? 'bg-gray-700/50 text-center' : msg.playerId === currentPlayer?.id ? 'bg-purple-500/20' : 'bg-gray-700/50'}`}>
+              <div key={msg.id} className="text-sm bg-gray-700/50 px-2 py-1 rounded">
                 <span className="font-bold">{msg.playerName}: </span>
                 <span>{msg.message}</span>
               </div>
@@ -252,18 +178,16 @@ export default function HangmanGame() {
 
       {/* Lobby */}
       {!isGameStarted && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-2xl p-6 max-w-md w-full mx-4">
             <h2 className="text-xl font-bold mb-4 text-center">Room Lobby</h2>
-            
             <div className="mb-4">
               <p className="text-gray-400 mb-2 text-sm">Room Code:</p>
               <div className="flex gap-2">
                 <input type="text" value={room.id} readOnly className="flex-1 px-4 py-3 bg-gray-700 rounded-lg text-center text-2xl font-mono" />
-                <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/hangman/join?room=${room.id}`)} className="px-4 bg-purple-500 hover:bg-purple-400 rounded-lg">📋</button>
+                <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/hangman/join?room=${room.id}`)} className="px-4 bg-purple-500 rounded-lg">📋</button>
               </div>
             </div>
-
             <div className="mb-4">
               <p className="text-gray-400 mb-2 text-sm">Players:</p>
               <div className="space-y-2 max-h-32 overflow-y-auto">
@@ -275,47 +199,23 @@ export default function HangmanGame() {
                 ))}
               </div>
             </div>
-
             {isHost ? (
-              <button onClick={handleStart} disabled={players.length < 1} className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-lg font-bold disabled:opacity-50">
-                Start Game 🚀
-              </button>
+              <button onClick={handleStart} disabled={players.length < 1} className="w-full py-3 bg-emerald-500 rounded-lg font-bold disabled:opacity-50">Start</button>
             ) : (
-              <div className="w-full py-3 bg-gray-700 rounded-lg font-bold text-center text-gray-400">
-                Waiting for host...
-              </div>
+              <div className="w-full py-3 bg-gray-700 rounded-lg text-center text-gray-400">Waiting...</div>
             )}
           </div>
         </div>
       )}
 
-      {/* How to Play Modal */}
       {showHelp && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setShowHelp(false)}>
-          <div className="bg-gray-800 rounded-2xl p-6 max-w-lg w-full" onClick={e => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold mb-4 text-center">❓ How to Play Hangman</h2>
-            
-            <div className="space-y-4 text-gray-300">
-              <p className="text-lg">Anyone can play! Here's how:</p>
-              <ol className="list-decimal list-inside space-y-3">
-                {HOW_TO_PLAY.steps.map((step, i) => (
-                  <li key={i} className="text-base">{step}</li>
-                ))}
-              </ol>
-              
-              <div className="mt-6 p-4 bg-yellow-500/20 rounded-lg">
-                <p className="text-yellow-300 font-bold">💡 Tips:</p>
-                <ul className="list-disc list-inside mt-2 text-sm">
-                  <li>Guess vowels first (A, E, I, O, U)</li>
-                  <li>Common letters like S, T, R, N are good too!</li>
-                  <li>Work together to solve the word fast!</li>
-                </ul>
-              </div>
-            </div>
-
-            <button onClick={() => setShowHelp(false)} className="w-full mt-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 rounded-lg font-bold">
-              Got it! Let's Play! 🎮
-            </button>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowHelp(false)}>
+          <div className="bg-gray-800 rounded-2xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-4">How to Play</h2>
+            <ol className="list-decimal list-inside space-y-2 text-gray-300">
+              {HOW_TO_PLAY.steps.map((step, i) => <li key={i}>{step}</li>)}
+            </ol>
+            <button onClick={() => setShowHelp(false)} className="w-full mt-6 py-3 bg-blue-500 rounded-lg font-bold">Got it!</button>
           </div>
         </div>
       )}
