@@ -16,9 +16,11 @@ interface SocketContextType {
   currentPlayer: Player | null;
   players: Player[];
   messages: ChatMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   currentWord: string;
   timeLeft: number;
   round: number;
+  totalRounds: number;
   isDrawer: boolean;
   isGameStarted: boolean;
   isHost: boolean;
@@ -54,6 +56,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [currentWord, setCurrentWord] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
   const [round, setRound] = useState(1);
+  const [totalRounds, setTotalRounds] = useState(3);
   const [isDrawer, setIsDrawer] = useState(false);
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [isHost, setIsHost] = useState(false);
@@ -137,6 +140,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setRoom(newRoom);
       setIsGameStarted(true);
       setRound(r);
+      setTotalRounds(newRoom.totalRounds || 3);
       setCurrentWord(word);
       setTimeLeft(t);
       setIsDrawer(drawerId === socket.id);
@@ -365,9 +369,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       currentPlayer,
       players,
       messages,
+      setMessages,
       currentWord,
       timeLeft,
       round,
+      totalRounds,
       isDrawer,
       isGameStarted,
       isHost,

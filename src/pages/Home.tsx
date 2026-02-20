@@ -25,8 +25,8 @@ const games = [
     description: 'Connect words by matching the last letter',
     icon: '🔤',
     color: 'from-purple-500 to-indigo-500',
-    status: 'Coming Soon',
-    link: '#',
+    status: 'Ready',
+    link: '/wordchain',
   },
   {
     id: 'trivia',

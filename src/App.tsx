@@ -5,8 +5,11 @@ import CreateRoom from './pages/CreateRoom';
 import JoinRoom from './pages/JoinRoom';
 import CreateHangmanRoom from './pages/CreateHangmanRoom';
 import JoinHangmanRoom from './pages/JoinHangmanRoom';
+import CreateWordChainRoom from './pages/CreateWordChainRoom';
+import JoinWordChainRoom from './pages/JoinWordChainRoom';
 import ScribbleGame from './games/scribble/ScribbleGame';
 import HangmanGame from './games/hangman/HangmanGame';
+import WordChainGame from './games/wordchain/WordChainGame';
 
 function App() {
   return (
@@ -26,6 +29,12 @@ function App() {
           <Route path="/hangman/create" element={<CreateHangmanRoom />} />
           <Route path="/hangman/join" element={<JoinHangmanRoom />} />
           <Route path="/hangman/room" element={<HangmanGame />} />
+          
+          {/* Word Chain */}
+          <Route path="/wordchain" element={<Navigate to="/wordchain/create" />} />
+          <Route path="/wordchain/create" element={<CreateWordChainRoom />} />
+          <Route path="/wordchain/join" element={<JoinWordChainRoom />} />
+          <Route path="/wordchain/room" element={<WordChainGame />} />
         </Routes>
       </BrowserRouter>
     </SocketProvider>

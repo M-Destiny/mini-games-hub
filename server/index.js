@@ -23,6 +23,7 @@ const rooms = new Map();
 // Word lists for different games
 const WORD_LISTS = {
   scribble: ['apple', 'banana', 'car', 'dog', 'elephant', 'flower', 'guitar', 'house', 'island', 'jungle', 'kite', 'lamp', 'mountain', 'notebook', 'ocean', 'pizza', 'queen', 'rainbow', 'sunflower', 'tree', 'umbrella', 'volcano', 'waterfall', 'xylophone'],
+  wordchain: ['APPLE', 'BANANA', 'CAT', 'DOG', 'ELEPHANT', 'FISH', 'GRAPE', 'HOUSE', 'ICE', 'JUMP', 'KITE', 'LION', 'MOON', 'NEST', 'OCEAN', 'PIZZA', 'QUEEN', 'RAIN', 'STAR', 'TREE', 'UMBRELLA', 'VIOLIN', 'WATER', 'YELLOW', 'ZEBRA'],
   hangman: {
     animals: ['ELEPHANT', 'GIRAFFE', 'DOLPHIN', 'PENGUIN', 'KANGAROO', 'BUTTERFLY', 'RHINOCEROS', 'CROCODILE', 'HIPPOPOTAMUS', 'OCTOPUS'],
     fruits: ['APPLE', 'BANANA', 'ORANGE', 'WATERMELON', 'STRAWBERRY', 'PINEAPPLE', 'BLUEBERRY', 'RASPBERRY', 'CHERRY', 'MANGO'],
@@ -138,9 +139,16 @@ io.on('connection', (socket) => {
     if (room.gameType === 'scribble') {
       room.isDrawer = room.players[0].id;
       room.currentWord = getRandomWord('scribble');
-    } else {
+    } else if (room.gameType === 'hangman') {
       room.isDrawer = null;
       room.currentWord = getRandomWord('hangman', room.category);
+    } else if (room.gameType === 'wordchain') {
+      room.isDrawer = null;
+      room.currentWord = WORD_LISTS.wordchain[Math.floor(Math.random() * WORD_LISTS.wordchain.length)];
+      room.chainWords = [room.currentWord];
+      room.lastLetter = room.currentWord.slice(-1);
+      room.currentPlayerIndex = 0;
+      room.wordChainTime = 20; // 20 seconds per turn
     }
     room.timeLeft = room.roundTime;
     
@@ -150,6 +158,14 @@ io.on('connection', (socket) => {
       round: room.round,
       timeLeft: room.timeLeft,
     });
+    
+    // Emit Word Chain specific event
+    if (room.gameType === 'wordchain') {
+      io.to(roomId).emit('wordchain-start', {
+        word: room.currentWord,
+        startedBy: socket.id,
+      });
+    }
     
     callback({ success: true });
   });
@@ -247,6 +263,57 @@ io.on('connection', (socket) => {
     if (callback) callback({ success: true, isCorrect });
   });
 
+  // Word Chain events
+  socket.on('wordchain-submit', ({ roomId, word }, callback) => {
+    const room = rooms.get(roomId);
+    if (!room || room.gameType !== 'wordchain') return;
+    
+    const wordUpper = word.toUpperCase().trim();
+    const currentPlayer = room.players[room.currentPlayerIndex];
+    
+    // Only the current player can submit
+    if (currentPlayer.id !== socket.id) {
+      if (callback) callback({ success: false, error: 'Not your turn' });
+      return;
+    }
+    
+    // Validate word starts with last letter
+    if (room.lastLetter && !wordUpper.startsWith(room.lastLetter)) {
+      if (callback) callback({ success: false, error: `Word must start with "${room.lastLetter}"` });
+      return;
+    }
+    
+    // Check if word was already used
+    if (room.chainWords.includes(wordUpper)) {
+      if (callback) callback({ success: false, error: 'Word already used!' });
+      return;
+    }
+    
+    // Add word to chain
+    room.chainWords.push(wordUpper);
+    room.lastLetter = wordUpper.slice(-1);
+    
+    // Award points
+    const player = room.players.find(p => p.id === socket.id);
+    if (player) player.score += 10;
+    
+    // Move to next player
+    room.currentPlayerIndex = (room.currentPlayerIndex + 1) % room.players.length;
+    
+    io.to(roomId).emit('wordchain-word', {
+      word: wordUpper,
+      playerId: socket.id,
+      playerName: socket.data.playerName,
+      isValid: true,
+      newChain: room.chainWords,
+    });
+    
+    // Check if round should end (chain gets too long or players want to continue)
+    // For now, just continue indefinitely until host ends
+    
+    if (callback) callback({ success: true });
+  });
+
   socket.on('leave-room', () => handleLeave(socket));
   socket.on('disconnect', () => handleLeave(socket));
 });
@@ -267,8 +334,13 @@ function nextRound(roomId, room) {
     const currentDrawerIndex = room.players.findIndex(p => p.id === room.isDrawer);
     room.isDrawer = room.players[(currentDrawerIndex + 1) % room.players.length].id;
     room.currentWord = getRandomWord('scribble');
-  } else {
+  } else if (room.gameType === 'hangman') {
     room.currentWord = getRandomWord('hangman', room.category);
+  } else if (room.gameType === 'wordchain') {
+    room.currentWord = WORD_LISTS.wordchain[Math.floor(Math.random() * WORD_LISTS.wordchain.length)];
+    room.chainWords = [room.currentWord];
+    room.lastLetter = room.currentWord.slice(-1);
+    room.currentPlayerIndex = 0;
   }
   room.timeLeft = room.roundTime;
   
