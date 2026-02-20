@@ -9,7 +9,6 @@ const io = new Server(httpServer, {
   },
 });
 
-// Game state
 const rooms = new Map();
 
 const DEFAULT_WORDS = [
