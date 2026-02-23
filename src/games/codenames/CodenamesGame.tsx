@@ -27,15 +27,6 @@ interface CodenamesCard {
   revealed: boolean;
 }
 
-// Word list for Codenames
-const CODENAMES_WORDS = [
-  'APPLE', 'BANK', 'CASTLE', 'DIAMOND', 'EAGLE', 'FISH', 'GHOST', 'HELMET',
-  'INDIA', 'JUNGLE', 'KING', 'LEMON', 'MOON', 'NIGHT', 'OCEAN', 'PIZZA',
-  'QUEEN', 'ROBOT', 'STAR', 'TIGER', 'UMBRELLA', 'VOICE', 'WATER', 'ZEBRA',
-  'ALIEN', 'BRIDGE', 'CLOUD', 'DRAGON', 'EYE', 'FLAME', 'GIANT', 'HEART',
-  'ICE', 'JUMP', 'KNIFE', 'LAMP', 'MILK', 'NEON', 'ORBIT', 'PEACE'
-];
-
 export default function CodenamesGame() {
   const [searchParams] = useSearchParams();
   const roomId = searchParams.get('roomId');
@@ -46,9 +37,7 @@ export default function CodenamesGame() {
   const [cards, setCards] = useState<CodenamesCard[]>([]);
   const [myTeam, setMyTeam] = useState<'red' | 'blue' | null>(null);
   const [isSpymaster, setIsSpymaster] = useState(false);
-  const [clue, setClue] = useState({ word: '', number: 1 });
-  const [guess, setGuess] = useState('');
-  const [messages, setMessages] = useState<{playerName: string, message: string}[]>([]);
+  const [clue, setClue] = useState<{word: string; number: number}>({ word: '', number: 1 });
   const [currentTurn, setCurrentTurn] = useState<'red' | 'blue'>('red');
   const [guessesLeft, setGuessesLeft] = useState(0);
   const [gameOver, setGameOver] = useState<{ winner: string | null; reason: string } | null>(null);
@@ -94,10 +83,6 @@ export default function CodenamesGame() {
       ));
     });
 
-    newSocket.on('codenames-message', (data: { playerName: string; message: string }) => {
-      setMessages(prev => [...prev, data]);
-    });
-
     newSocket.on('codenames-game-over', (data: { winner: string | null; reason: string }) => {
       setGameOver(data);
       setRoom(prev => prev ? { ...prev, gameStarted: false } : null);
@@ -125,14 +110,6 @@ export default function CodenamesGame() {
 
   const guessWord = (index: number) => {
     socket?.emit('codenames-guess', { roomId, index });
-  };
-
-  const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (guess.trim()) {
-      socket?.emit('codenames-message', { roomId, message: guess });
-      setGuess('');
-    }
   };
 
   const redScore = cards.filter(c => c.type === 'red' && c.revealed).length;
