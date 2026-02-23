@@ -596,6 +596,12 @@ setInterval(() => {
   });
 }, 1000);
 
+// Cron event - runs every minute and logs current date/time
+setInterval(() => {
+  const now = new Date();
+  console.log(`[CRON] ${now.toISOString()} - Current date & time: ${now.toLocaleString()}`);
+}, 60000); // Every 60 seconds
+
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
