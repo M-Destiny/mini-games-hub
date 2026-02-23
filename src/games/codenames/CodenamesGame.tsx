@@ -1,25 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { io, Socket } from 'socket.io-client';
-
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
-
-interface Player {
-  id: string;
-  name: string;
-  score: number;
-}
-
-interface Room {
-  id: string;
-  name: string;
-  gameType: string;
-  hostId: string;
-  players: Player[];
-  gameStarted: boolean;
-  currentWord: null;
-  isDrawer: null;
-}
+import { SocketContext } from '../context/SocketContext';
 
 interface CodenamesCard {
   word: string;
@@ -30,10 +11,15 @@ interface CodenamesCard {
 export default function CodenamesGame() {
   const [searchParams] = useSearchParams();
   const roomId = searchParams.get('roomId');
-  const playerName = searchParams.get('playerName') || 'Player';
   
-  const [socket, setSocket] = useState<Socket | null>(null);
-  const [room, setRoom] = useState<Room | null>(null);
+  const { 
+    socket, 
+    room, 
+    players, 
+    isGameStarted,
+    isHost 
+  } = useContext(SocketContext)!;
+  
   const [cards, setCards] = useState<CodenamesCard[]>([]);
   const [myTeam, setMyTeam] = useState<'red' | 'blue' | null>(null);
   const [isSpymaster, setIsSpymaster] = useState(false);
@@ -41,35 +27,17 @@ export default function CodenamesGame() {
   const [currentTurn, setCurrentTurn] = useState<'red' | 'blue'>('red');
   const [guessesLeft, setGuessesLeft] = useState(0);
   const [gameOver, setGameOver] = useState<{ winner: string | null; reason: string } | null>(null);
-  const [myId, setMyId] = useState('');
 
   useEffect(() => {
-    const newSocket = io(SOCKET_URL);
-    setSocket(newSocket);
+    if (!socket) return;
 
-    newSocket.on('connect', () => {
-      setMyId(newSocket.id || '');
-      newSocket.emit('join-room', { roomId, playerName }, (response: any) => {
-        if (response.success) {
-          setRoom(response.room);
-          if (response.room.cards) {
-            setCards(response.room.cards);
-          }
-        }
-      });
-    });
-
-    newSocket.on('room-updated', (updatedRoom: Room) => {
-      setRoom(updatedRoom);
-    });
-
-    newSocket.on('codenames-setup', (data: { cards: CodenamesCard[]; team: 'red' | 'blue'; isSpymaster: boolean }) => {
+    socket.on('codenames-setup', (data: { cards: CodenamesCard[]; team: 'red' | 'blue'; isSpymaster: boolean }) => {
       setCards(data.cards);
       setMyTeam(data.team);
       setIsSpymaster(data.isSpymaster);
     });
 
-    newSocket.on('codenames-turn', (data: { team: 'red' | 'blue'; guessesLeft: number; spymaster: string; clue: { word: string; number: number } | null }) => {
+    socket.on('codenames-turn', (data: { team: 'red' | 'blue'; guessesLeft: number; clue: { word: string; number: number } | null }) => {
       setCurrentTurn(data.team);
       setGuessesLeft(data.guessesLeft);
       if (data.clue) {
@@ -77,25 +45,35 @@ export default function CodenamesGame() {
       }
     });
 
-    newSocket.on('codenames-card-revealed', (data: { index: number; type: string }) => {
+    socket.on('codenames-card-revealed', (data: { index: number; type: string }) => {
       setCards(prev => prev.map((card, i) => 
         i === data.index ? { ...card, revealed: true } : card
       ));
     });
 
-    newSocket.on('codenames-game-over', (data: { winner: string | null; reason: string }) => {
+    socket.on('codenames-game-over', (data: { winner: string | null; reason: string }) => {
       setGameOver(data);
-      setRoom(prev => prev ? { ...prev, gameStarted: false } : null);
     });
 
-    newSocket.on('codenames-correct-guess', (data: { guessesLeft: number }) => {
+    socket.on('codenames-correct-guess', (data: { guessesLeft: number }) => {
       setGuessesLeft(data.guessesLeft);
     });
 
+    socket.on('room-updated', (updatedRoom: any) => {
+      if (updatedRoom.gameType === 'codenames') {
+        setCards(updatedRoom.cards || []);
+      }
+    });
+
     return () => {
-      newSocket.disconnect();
+      socket.off('codenames-setup');
+      socket.off('codenames-turn');
+      socket.off('codenames-card-revealed');
+      socket.off('codenames-game-over');
+      socket.off('codenames-correct-guess');
+      socket.off('room-updated');
     };
-  }, [roomId, playerName]);
+  }, [socket]);
 
   const startGame = () => {
     socket?.emit('start-codenames', { roomId });
@@ -206,7 +184,7 @@ export default function CodenamesGame() {
       ) : (
         <div className="max-w-4xl mx-auto text-center mb-6">
           <p className="text-gray-400 mb-4">Waiting for host to start the game...</p>
-          {room.hostId === myId && (
+          {isHost && (
             <button
               onClick={startGame}
               className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-xl"
@@ -252,7 +230,7 @@ export default function CodenamesGame() {
       <div className="max-w-4xl mx-auto">
         <h3 className="font-bold text-lg mb-2">👥 Players</h3>
         <div className="flex flex-wrap gap-2">
-          {room.players.map((player) => (
+          {players.map((player) => (
             <div key={player.id} className="bg-gray-800 px-4 py-2 rounded-lg">
               {player.name}
             </div>

@@ -1,33 +1,24 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
-
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+import { SocketContext } from '../context/SocketContext';
 
 export default function CreateCodenamesRoom() {
   const navigate = useNavigate();
+  const { createRoom } = useContext(SocketContext)!;
   const [playerName, setPlayerName] = useState('');
   const [roomName, setRoomName] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const createRoom = async (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!playerName.trim() || !roomName.trim()) return;
-
-    setLoading(true);
-    const socket = io(SOCKET_URL);
     
-    socket.emit('create-room', { 
-      playerName, 
-      roomName, 
-      gameType: 'codenames',
-      settings: {}
-    }, (response: any) => {
-      if (response.success) {
-        navigate(`/codenames/room?roomId=${response.room.id}&playerName=${playerName}`);
-      }
-      setLoading(false);
-    });
+    createRoom(playerName, roomName, 'codenames', {});
+    
+    // Navigate after a short delay to allow socket to connect
+    setTimeout(() => {
+      const urlParams = new URLSearchParams({ playerName });
+      navigate(`/codenames/room?${urlParams.toString()}`);
+    }, 500);
   };
 
   return (
@@ -36,7 +27,7 @@ export default function CreateCodenamesRoom() {
         <h1 className="text-3xl font-bold text-center mb-2">🎯 Codenames</h1>
         <p className="text-gray-400 text-center mb-6">Create a new room</p>
 
-        <form onSubmit={createRoom} className="space-y-4">
+        <form onSubmit={handleCreate} className="space-y-4">
           <div>
             <label className="block text-sm text-gray-400 mb-1">Your Name</label>
             <input
@@ -63,10 +54,9 @@ export default function CreateCodenamesRoom() {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold py-3 rounded-lg disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold py-3 rounded-lg"
           >
-            {loading ? 'Creating...' : 'Create Room'}
+            Create Room
           </button>
         </form>
 

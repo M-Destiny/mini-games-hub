@@ -1,32 +1,25 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { io } from 'socket.io-client';
-
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+import { SocketContext } from '../context/SocketContext';
 
 export default function JoinCodenamesRoom() {
   const navigate = useNavigate();
+  const { joinRoom } = useContext(SocketContext)!;
   const [playerName, setPlayerName] = useState('');
   const [roomId, setRoomId] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const joinRoom = async (e: React.FormEvent) => {
+  const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!playerName.trim() || !roomId.trim()) return;
 
-    setLoading(true);
-    setError('');
-    const socket = io(SOCKET_URL);
+    joinRoom(roomId.toUpperCase(), playerName);
     
-    socket.emit('join-room', { playerName, roomId: roomId.toUpperCase() }, (response: any) => {
-      if (response.success) {
-        navigate(`/codenames/room?roomId=${roomId.toUpperCase()}&playerName=${playerName}`);
-      } else {
-        setError(response.error || 'Failed to join room');
-      }
-      setLoading(false);
-    });
+    // Navigate after a short delay
+    setTimeout(() => {
+      const urlParams = new URLSearchParams({ roomId: roomId.toUpperCase(), playerName });
+      navigate(`/codenames/room?${urlParams.toString()}`);
+    }, 500);
   };
 
   return (
@@ -35,7 +28,7 @@ export default function JoinCodenamesRoom() {
         <h1 className="text-3xl font-bold text-center mb-2">🎯 Codenames</h1>
         <p className="text-gray-400 text-center mb-6">Join a room</p>
 
-        <form onSubmit={joinRoom} className="space-y-4">
+        <form onSubmit={handleJoin} className="space-y-4">
           <div>
             <label className="block text-sm text-gray-400 mb-1">Your Name</label>
             <input
@@ -66,10 +59,9 @@ export default function JoinCodenamesRoom() {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold py-3 rounded-lg disabled:opacity-50"
+            className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white font-bold py-3 rounded-lg"
           >
-            {loading ? 'Joining...' : 'Join Room'}
+            Join Room
           </button>
         </form>
 
