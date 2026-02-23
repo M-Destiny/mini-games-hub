@@ -37,6 +37,15 @@ const games = [
     status: 'Ready',
     link: '/trivia',
   },
+  {
+    id: 'codenames',
+    name: 'Codenames',
+    description: 'Word guessing game for two teams!',
+    icon: '🎯',
+    color: 'from-red-600 to-orange-600',
+    status: 'Ready',
+    link: '/codenames',
+  },
 ];
 
 export default function Home() {

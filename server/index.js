@@ -47,7 +47,14 @@ const WORD_LISTS = {
     countries: ['AMERICA', 'CANADA', 'BRAZIL', 'GERMANY', 'AUSTRALIA', 'JAPAN', 'CHINA', 'INDIA', 'FRANCE', 'ITALY'],
     movies: ['AVENGERS', 'TITANIC', 'FROZEN', 'SPIDERMAN', 'BATMAN', 'IRONMAN', 'JURASSIC', 'STARWARS', 'MATRIX', 'GLADIATOR'],
     sports: ['FOOTBALL', 'CRICKET', 'TENNIS', 'BASKETBALL', 'BASEBALL', 'HOCKEY', 'GOLF', 'SWIMMING', 'BOXING', 'RUGBY'],
-  }
+  },
+  codenames: [
+    'APPLE', 'BANK', 'CASTLE', 'DIAMOND', 'EAGLE', 'FISH', 'GHOST', 'HELMET',
+    'INDIA', 'JUNGLE', 'KING', 'LEMON', 'MOON', 'NIGHT', 'OCEAN', 'PIZZA',
+    'QUEEN', 'ROBOT', 'STAR', 'TIGER', 'UMBRELLA', 'VOICE', 'WATER', 'ZEBRA',
+    'ALIEN', 'BRIDGE', 'CLOUD', 'DRAGON', 'EYE', 'FLAME', 'GIANT', 'HEART',
+    'ICE', 'JUMP', 'KNIFE', 'LAMP', 'MILK', 'NEON', 'ORBIT', 'PEACE'
+  ]
 };
 
 function getRandomWord(gameType, category = null) {
@@ -432,6 +439,172 @@ io.on('connection', (socket) => {
 
   socket.on('leave-room', () => handleLeave(socket));
   socket.on('disconnect', () => handleLeave(socket));
+
+  // Codenames events
+  socket.on('start-codenames', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.gameType !== 'codenames') return;
+    if (room.hostId !== socket.id) return;
+    
+    // Setup codenames board
+    const wordPool = [...WORD_LISTS.codenames];
+    const shuffled = wordPool.sort(() => Math.random() - 0.5).slice(0, 25);
+    
+    // Assign card types: 9 red, 9 blue, 7 neutral, 1 assassin
+    const types = [
+      ...Array(9).fill('red'),
+      ...Array(9).fill('blue'),
+      ...Array(7).fill('neutral'),
+      'assassin'
+    ].sort(() => Math.random() - 0.5);
+    
+    const cards = shuffled.map((word, i) => ({
+      word,
+      type: types[i],
+      revealed: false
+    }));
+    
+    room.cards = cards;
+    room.gameStarted = true;
+    
+    // Assign teams - alternate between red and blue
+    room.players.forEach((player, index) => {
+      player.team = index % 2 === 0 ? 'red' : 'blue';
+      player.isSpymaster = index < 2; // First two players are spymasters
+    });
+    
+    room.currentTurn = 'red'; // Red goes first
+    room.currentSpymaster = room.players.find(p => p.team === 'red' && p.isSpymaster)?.id;
+    
+    // Send setup to each player
+    room.players.forEach(player => {
+      const playerTeam = player.team;
+      const playerIsSpymaster = player.isSpymaster;
+      
+      // Spymasters see all cards, operatives only see unrevealed
+      const visibleCards = cards.map(card => ({
+        ...card,
+        type: playerIsSpymaster ? card.type : (card.revealed ? card.type : 'hidden')
+      }));
+      
+      io.to(player.id).emit('codenames-setup', {
+        cards: visibleCards,
+        team: playerTeam,
+        isSpymaster: playerIsSpymaster
+      });
+      
+      io.to(player.id).emit('codenames-turn', {
+        team: room.currentTurn,
+        guessesLeft: playerIsSpymaster ? 0 : 1,
+        spymaster: room.currentSpymaster,
+        clue: null
+      });
+    });
+    
+    io.to(roomId).emit('room-updated', room);
+  });
+
+  socket.on('codenames-clue', ({ roomId, clue }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.gameType !== 'codenames') return;
+    
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || !player.isSpymaster) return;
+    if (player.team !== room.currentTurn) return;
+    
+    room.currentClue = clue;
+    room.guessesLeft = clue.number;
+    
+    io.to(roomId).emit('codenames-turn', {
+      team: room.currentTurn,
+      guessesLeft: room.guessesLeft,
+      spymaster: socket.id,
+      clue
+    });
+  });
+
+  socket.on('codenames-guess', ({ roomId, index }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.gameType !== 'codenames' || !room.gameStarted) return;
+    
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player || player.isSpymaster) return;
+    if (player.team !== room.currentTurn) return;
+    if (room.guessesLeft <= 0) return;
+    
+    const card = room.cards[index];
+    if (!card || card.revealed) return;
+    
+    card.revealed = true;
+    room.guessesLeft--;
+    
+    io.to(roomId).emit('codenames-card-revealed', { index, type: card.type });
+    
+    // Check for game over conditions
+    if (card.type === 'assassin') {
+      const winner = room.currentTurn === 'blue' ? 'red' : 'blue';
+      io.to(roomId).emit('codenames-game-over', {
+        winner,
+        reason: 'Assassin word revealed!'
+      });
+      room.gameStarted = false;
+      return;
+    }
+    
+    if (card.type === room.currentTurn) {
+      // Correct guess - give points and continue
+      const teamPlayer = room.players.find(p => p.team === room.currentTurn);
+      if (teamPlayer) teamPlayer.score += 1;
+      
+      io.to(roomId).emit('codenames-correct-guess', {
+        guessesLeft: room.guessesLeft
+      });
+      
+      // Check if team won
+      const remaining = room.cards.filter(c => c.type === room.currentTurn && !c.revealed).length;
+      if (remaining === 0) {
+        io.to(roomId).emit('codenames-game-over', {
+          winner: room.currentTurn,
+          reason: `All ${room.currentTurn} words revealed!`
+        });
+        room.gameStarted = false;
+        return;
+      }
+      
+      if (room.guessesLeft <= 0) {
+        // Pass turn
+        room.currentTurn = room.currentTurn === 'red' ? 'blue' : 'red';
+        room.currentSpymaster = room.players.find(p => p.team === room.currentTurn && p.isSpymaster)?.id;
+        room.guessesLeft = 0;
+        
+        io.to(roomId).emit('codenames-turn', {
+          team: room.currentTurn,
+          guessesLeft: 0,
+          spymaster: room.currentSpymaster,
+          clue: null
+        });
+      }
+    } else {
+      // Wrong guess - pass turn
+      room.currentTurn = room.currentTurn === 'red' ? 'blue' : 'red';
+      room.currentSpymaster = room.players.find(p => p.team === room.currentTurn && p.isSpymaster)?.id;
+      room.guessesLeft = 0;
+      
+      io.to(roomId).emit('codenames-turn', {
+        team: room.currentTurn,
+        guessesLeft: 0,
+        spymaster: room.currentSpymaster,
+        clue: null
+      });
+    }
+  });
+
+  socket.on('codenames-message', ({ roomId, message }) => {
+    io.to(roomId).emit('codenames-message', {
+      playerName: socket.data.playerName,
+      message
+    });
+  });
 });
 
 function nextRound(roomId, room) {

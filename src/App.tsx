@@ -13,6 +13,9 @@ import ScribbleGame from './games/scribble/ScribbleGame';
 import HangmanGame from './games/hangman/HangmanGame';
 import WordChainGame from './games/wordchain/WordChainGame';
 import TriviaGame from './games/trivia/TriviaGame';
+import CodenamesGame from './games/codenames/CodenamesGame';
+import CreateCodenamesRoom from './pages/CreateCodenamesRoom';
+import JoinCodenamesRoom from './pages/JoinCodenamesRoom';
 
 function App() {
   return (
@@ -44,6 +47,12 @@ function App() {
           <Route path="/trivia/create" element={<CreateTriviaRoom />} />
           <Route path="/trivia/join" element={<JoinTriviaRoom />} />
           <Route path="/trivia/room" element={<TriviaGame />} />
+          
+          {/* Codenames */}
+          <Route path="/codenames" element={<Navigate to="/codenames/create" />} />
+          <Route path="/codenames/create" element={<CreateCodenamesRoom />} />
+          <Route path="/codenames/join" element={<JoinCodenamesRoom />} />
+          <Route path="/codenames/room" element={<CodenamesGame />} />
         </Routes>
       </BrowserRouter>
     </SocketProvider>
